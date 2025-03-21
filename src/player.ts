@@ -1,66 +1,11 @@
-interface SessionInfo {
-  codec: string;
-  sampleRate: number;
-  channels: number;
-  bitDepth: number;
-  now: number; // in ms
-}
-
-interface Logger {
-  log: (message: string, ...data: any) => void;
-  error: (message: string, ...data: any) => void;
-}
-
-// Binary codec identifier mapping (byte value to string representation)
-export const CODEC_MAP: Record<number, string> = {
-  1: "pcm",
-  2: "mp3",
-  3: "aac",
-};
-
-interface PlayerHelloMessage {
-  type: "player/hello";
-  payload: {
-    playerId: string;
-    name: string;
-    supportedCodecs: string[];
-    channels: number[];
-    sampleRates: number[];
-    bitDepth: number[];
-    role: string;
-    supportedStreams: string[];
-    mediaFormats: string[];
-  };
-}
-
-interface SourceInfo {
-  sourceId: string;
-  name: string;
-}
-
-interface SourceHelloMessage {
-  type: "source/hello";
-  payload: SourceInfo;
-}
-
-interface SessionStartMessage {
-  type: "session/start";
-  payload: SessionInfo;
-}
-
-interface SessionEndMessage {
-  type: "session/end";
-}
-
-type TextMessage =
-  | PlayerHelloMessage
-  | SourceHelloMessage
-  | SessionStartMessage
-  | SessionEndMessage;
-
-enum BinaryMessageType {
-  PlayAudioChunk = 1,
-}
+import {
+  SourceInfo,
+  SessionInfo,
+  TextMessage,
+  BinaryMessageType,
+  CODEC_MAP,
+} from "./messages";
+import { Logger } from "./logging";
 
 export class Player {
   private ws: WebSocket | null = null;
