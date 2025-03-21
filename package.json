@@ -1,0 +1,11 @@
+{
+  "name": "improv-audio",
+  "version": "1.0.0",
+  "description": "Play audio from JavaScript",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Open Home Foundation",
+  "license": "Apache-2.0"
+}
