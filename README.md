@@ -17,17 +17,10 @@ A simple example of an audio player implementation using WebSockets.
    - Watch for TypeScript changes and recompile automatically
    - Serve the app at http://localhost:3000
 
-3. For production serving only (without TypeScript watching):
+3. Start the demo backend on port 3001:
    ```bash
-   npm start
+   node server.js
    ```
-
-## Usage
-
-1. Enter your WebSocket audio server URL in the input field
-2. Click "Connect" to establish a connection
-3. The status will update to show connection state
-4. Click "Disconnect" to terminate the connection
 
 ## Development
 
