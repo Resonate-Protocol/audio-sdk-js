@@ -132,8 +132,11 @@ export class Player {
       case "session/start":
         console.log("Session started", message.payload);
         this.sessionInfo = message.payload;
-        this.audioContext = new (window.AudioContext ||
-          window.webkitAudioContext)();
+
+        // Use standard AudioContext or fallback to webkitAudioContext
+        const AudioContextClass =
+          window.AudioContext || window.webkitAudioContext;
+        this.audioContext = new AudioContextClass();
 
         // Convert server time to seconds for consistent unit with audioContext.currentTime
         this.serverTimeDiff =
