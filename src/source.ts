@@ -4,17 +4,22 @@ import {
   PlayerInfo,
   BinaryMessageType,
   CODEC_MAP,
+  SessionEndMessage,
+  TextMessage,
 } from "./messages";
 import { Logger } from "./logging";
+import * as WebSocket from "ws";
+import { IncomingMessage } from "http";
 
 export class Source {
-  private ws: WebSocket | null = null;
+  private server: WebSocket.Server | null = null;
+  private clients: Map<string, WebSocket> = new Map();
   private players: Map<string, PlayerInfo> = new Map();
   private sessionActive: boolean = false;
   private sessionInfo: SessionInfo | null = null;
   private sourceInfo: SourceInfo;
 
-  constructor(public url: string, private logger: Logger = console) {
+  constructor(public port: number, private logger: Logger = console) {
     // Initialize source info with default values
     this.sourceInfo = {
       sourceId: this.generateUniqueId(),
@@ -26,44 +31,76 @@ export class Source {
     return `source_${Math.random().toString(36).substring(2, 9)}`;
   }
 
-  // Connect to the WebSocket server
-  connect() {
-    this.ws = new WebSocket(this.url);
-    this.ws.binaryType = "arraybuffer";
+  // Start the WebSocket server
+  start() {
+    try {
+      this.server = new WebSocket.Server({ port: this.port });
+      this.logger.log(`WebSocket server started on port ${this.port}`);
 
-    this.ws.onopen = () => {
-      this.logger.log("WebSocket connected");
-    };
+      this.server.on("connection", this.handleConnection.bind(this));
+      this.server.on("error", (error) => {
+        this.logger.error("WebSocket server error:", error);
+      });
 
-    this.ws.onmessage = (event) => {
-      if (typeof event.data === "string") {
-        try {
-          const message = JSON.parse(event.data);
-          this.handleMessage(message);
-        } catch (err) {
-          this.logger.error("Error parsing message", err);
-        }
-      }
-    };
-
-    this.ws.onerror = (error) => {
-      this.logger.error("WebSocket error:", error);
-    };
-
-    this.ws.onclose = () => {
-      this.logger.log("WebSocket connection closed");
-      this.sessionActive = false;
-      this.sessionInfo = null;
-    };
+      return true;
+    } catch (err) {
+      this.logger.error("Failed to start WebSocket server:", err);
+      return false;
+    }
   }
 
-  // Handle incoming messages from players
-  handleMessage(message: any) {
-    this.logger.log("Received message:", message);
+  // Handle new client connections
+  private handleConnection(ws: WebSocket, request: IncomingMessage) {
+    const clientId = this.generateUniqueId();
+    this.clients.set(clientId, ws);
+    this.logger.log(`Client connected: ${clientId}`);
 
+    ws.on("message", (message) => {
+      this.handleClientMessage(clientId, ws, message);
+    });
+
+    ws.on("close", () => {
+      this.logger.log(`Client disconnected: ${clientId}`);
+      this.clients.delete(clientId);
+
+      // Find and remove any associated player
+      for (const [playerId, playerInfo] of this.players.entries()) {
+        if (playerInfo.playerId === clientId) {
+          this.players.delete(playerId);
+          break;
+        }
+      }
+    });
+
+    ws.on("error", (error) => {
+      this.logger.error(`Client ${clientId} error:`, error);
+    });
+  }
+
+  // Handle incoming messages from clients
+  private handleClientMessage(
+    clientId: string,
+    ws: WebSocket,
+    message: WebSocket.Data,
+  ) {
+    if (typeof message === "string") {
+      try {
+        const parsedMessage = JSON.parse(message);
+        this.logger.log(`Received message from ${clientId}:`, parsedMessage);
+        this.handleMessage(clientId, ws, parsedMessage);
+      } catch (err) {
+        this.logger.error(`Error parsing message from ${clientId}:`, err);
+      }
+    }
+  }
+
+  // Handle parsed messages
+  handleMessage(clientId: string, ws: WebSocket, message: any) {
     switch (message.type) {
       case "player/hello":
-        this.handlePlayerHello(message.payload);
+        const playerInfo = message.payload;
+        playerInfo.clientId = clientId; // Associate client ID with player
+        this.handlePlayerHello(ws, playerInfo);
         break;
       default:
         this.logger.log("Unhandled message type:", message.type);
@@ -71,29 +108,24 @@ export class Source {
   }
 
   // Handle player hello message
-  handlePlayerHello(playerInfo: PlayerInfo) {
+  handlePlayerHello(ws: WebSocket, playerInfo: PlayerInfo) {
     this.logger.log("Player connected:", playerInfo);
 
     // Store player information
     this.players.set(playerInfo.playerId, playerInfo);
 
     // Send source hello
-    this.sendSourceHello(playerInfo.playerId);
+    this.sendSourceHello(ws, playerInfo.playerId);
   }
 
   // Send source hello message to player
-  sendSourceHello(playerId: string) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.logger.error("WebSocket not connected");
-      return;
-    }
-
+  sendSourceHello(ws: WebSocket, playerId: string) {
     const sourceHelloMessage = {
       type: "source/hello",
       payload: this.sourceInfo,
     };
 
-    this.ws.send(JSON.stringify(sourceHelloMessage));
+    ws.send(JSON.stringify(sourceHelloMessage));
     this.logger.log("Sent source/hello:", sourceHelloMessage);
   }
 
@@ -104,8 +136,8 @@ export class Source {
     channels: number = 2,
     bitDepth: number = 16,
   ) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.logger.error("WebSocket not connected");
+    if (!this.server) {
+      this.logger.error("WebSocket server not started");
       return false;
     }
 
@@ -124,14 +156,14 @@ export class Source {
       bitDepth,
     };
 
-    // Send session start message
+    // Send session start message to all players
     const sessionStartMessage = {
-      type: "session/start",
+      type: "session/start" as const,
       payload: this.sessionInfo,
     };
 
-    this.ws.send(JSON.stringify(sessionStartMessage));
-    this.logger.log("Sent session/start:", sessionStartMessage);
+    this.broadcastMessage(sessionStartMessage);
+    this.logger.log("Broadcasted session/start:", sessionStartMessage);
 
     this.sessionActive = true;
     return true;
@@ -139,8 +171,8 @@ export class Source {
 
   // End the audio session
   endSession() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.logger.error("WebSocket not connected");
+    if (!this.server) {
+      this.logger.error("WebSocket server not started");
       return;
     }
 
@@ -150,24 +182,31 @@ export class Source {
     }
 
     // Send session end message
-    const sessionEndMessage = {
+    const sessionEndMessage: SessionEndMessage = {
       type: "session/end",
-      payload: {
-        sessionId: this.sessionInfo?.sessionId,
-      },
     };
 
-    this.ws.send(JSON.stringify(sessionEndMessage));
-    this.logger.log("Sent session/end:", sessionEndMessage);
+    this.broadcastMessage(sessionEndMessage);
+    this.logger.log("Broadcasted session/end:", sessionEndMessage);
 
     this.sessionActive = false;
     this.sessionInfo = null;
   }
 
-  // Send audio data to player
+  // Broadcast a message to all connected clients
+  private broadcastMessage(message: TextMessage) {
+    const messageString = JSON.stringify(message);
+    for (const ws of this.clients.values()) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(messageString);
+      }
+    }
+  }
+
+  // Send audio data to all players
   sendAudio(audioData: Float32Array[], timestamp: number) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.logger.error("WebSocket not connected");
+    if (!this.server) {
+      this.logger.error("WebSocket server not started");
       return;
     }
 
@@ -196,7 +235,7 @@ export class Source {
     }
 
     if (codecByteValue === undefined) {
-      this.logger.error(`Unknown codec: ${codec}`);
+      this.logger.error("Invalid codec:", codec);
       return;
     }
 
@@ -232,10 +271,14 @@ export class Source {
       }
     }
 
-    // Send the binary message
-    this.ws.send(buffer);
+    // Broadcast the binary message to all clients
+    for (const ws of this.clients.values()) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(buffer);
+      }
+    }
     this.logger.log(
-      `Sent audio chunk: ${sampleCount} samples at timestamp ${timestamp}ms`,
+      `Broadcasted audio chunk: ${sampleCount} samples at timestamp ${timestamp}ms to ${this.clients.size} clients`,
     );
   }
 
@@ -274,17 +317,20 @@ export class Source {
     this.sendAudio(floatData, timestamp);
   }
 
-  // Disconnect from the WebSocket server
-  disconnect() {
+  // Stop the WebSocket server
+  stop() {
     if (this.sessionActive) {
       this.endSession();
     }
 
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    if (this.server) {
+      this.server.close(() => {
+        this.logger.log("WebSocket server closed");
+      });
+      this.server = null;
     }
 
+    this.clients.clear();
     this.players.clear();
   }
 }

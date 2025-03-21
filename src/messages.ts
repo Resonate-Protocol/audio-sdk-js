@@ -1,4 +1,5 @@
 export interface SessionInfo {
+  sessionId: string;
   codec: string;
   sampleRate: number;
   channels: number;
