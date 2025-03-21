@@ -33,13 +33,6 @@
         background-color: #f5f5f5;
         border-radius: 3px;
       }
-      .info-box {
-        margin: 20px 0;
-        padding: 15px;
-        background-color: #e6f7ff;
-        border: 1px solid #91d5ff;
-        border-radius: 5px;
-      }
       code {
         background-color: #f0f0f0;
         padding: 2px 4px;
@@ -50,22 +43,6 @@
   </head>
   <body>
     <h1>Improv Audio Player</h1>
-
-    <div class="info-box">
-      <h3>Development Instructions</h3>
-      <p>To run this example locally:</p>
-      <ol>
-        <li>Install dependencies: <code>npm install</code></li>
-        <li>Start the server: <code>npm run dev</code></li>
-        <li>
-          Open
-          <a href="http://localhost:3000" target="_blank"
-            >http://localhost:3000</a
-          >
-          in your browser
-        </li>
-      </ol>
-    </div>
 
     <div id="app-container">
       <div class="control-panel">
@@ -80,10 +57,7 @@
       </div>
     </div>
 
-    <!-- Load the Player class first -->
     <script type="module" src="./dist/player.js"></script>
-
-    <!-- Inline JavaScript (simplified) -->
     <script type="module">
       import { Player } from "./dist/player.js";
 
