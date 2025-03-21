@@ -239,15 +239,33 @@ export class Player {
       sampleRate,
     );
 
-    // Decode the interleaved 16-bit PCM data for each channel
-    for (let channel = 0; channel < channels; channel++) {
-      const channelData = audioBuffer.getChannelData(channel);
-      for (let i = 0; i < totalSamples; i++) {
-        // Calculate the byte offset for this sample (accounting for header)
-        const offset = headerSize + (i * channels + channel) * bytesPerSample;
-        const sample = dataView.getInt16(offset, true); // little-endian
-        // Convert the 16-bit PCM value to a float in the range [-1, 1]
-        channelData[i] = sample / 32768;
+    // Add a comment explaining why we need this manual conversion
+    // We must manually process the audio data because:
+    // 1. Web Audio API uses 32-bit float samples in range [-1,1]
+    // 2. Our input is 16-bit PCM integers in an interleaved format
+    // 3. AudioBuffer expects separate Float32Arrays for each channel
+
+    // Create channel arrays for more efficient processing
+    const channelArrays = [];
+    for (let c = 0; c < channels; c++) {
+      channelArrays.push(audioBuffer.getChannelData(c));
+    }
+
+    // Process all samples more efficiently
+    for (let i = 0; i < totalSamples; i++) {
+      // Calculate the base offset for this sample frame
+      const baseOffset = headerSize + i * channels * bytesPerSample;
+
+      // Process each channel
+      for (let channel = 0; channel < channels; channel++) {
+        // Get the sample from the data view
+        const sample = dataView.getInt16(
+          baseOffset + channel * bytesPerSample,
+          true,
+        ); // little-endian
+
+        // Convert to float and store in the channel array
+        channelArrays[channel][i] = sample / 32768;
       }
     }
 
