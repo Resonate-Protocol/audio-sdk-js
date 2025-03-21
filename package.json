@@ -2,7 +2,6 @@
   "name": "improv-audio",
   "version": "1.0.0",
   "description": "Play audio from JavaScript",
-  "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
