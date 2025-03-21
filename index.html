@@ -32,12 +32,38 @@
         padding: 10px;
         background-color: #f5f5f5;
         border-radius: 3px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .log-entry {
+        margin: 4px 0;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .log-info {
+        color: #333;
+      }
+      .log-error {
+        color: #d32f2f;
+      }
+      .log-time {
+        color: #777;
+        margin-right: 6px;
       }
       code {
         background-color: #f0f0f0;
         padding: 2px 4px;
         border-radius: 3px;
         font-family: monospace;
+      }
+      .clear-logs {
+        margin-top: 10px;
+        padding: 5px 10px;
+        font-size: 12px;
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        cursor: pointer;
       }
     </style>
   </head>
@@ -53,7 +79,11 @@
           placeholder="WebSocket URL"
         />
         <button id="connect-button">Connect</button>
-        <div id="status-display" class="status">Disconnected</div>
+        <div class="status-container">
+          <div id="connection-status">Disconnected</div>
+          <div id="status-display" class="status"></div>
+          <button class="clear-logs" id="clear-logs-btn">Clear Logs</button>
+        </div>
       </div>
     </div>
 
@@ -65,6 +95,97 @@
       const urlInput = document.getElementById("url-input");
       const connectButton = document.getElementById("connect-button");
       const statusDisplay = document.getElementById("status-display");
+      const connectionStatus = document.getElementById("connection-status");
+      const clearLogsBtn = document.getElementById("clear-logs-btn");
+
+      // Create a custom logger that outputs to both console and status-display div
+      class DisplayLogger {
+        constructor(displayElement) {
+          this.displayElement = displayElement;
+        }
+
+        formatTime() {
+          const now = new Date();
+          return `${now.getHours().toString().padStart(2, "0")}:${now
+            .getMinutes()
+            .toString()
+            .padStart(2, "0")}:${now
+            .getSeconds()
+            .toString()
+            .padStart(2, "0")}.${now
+            .getMilliseconds()
+            .toString()
+            .padStart(3, "0")}`;
+        }
+
+        appendToDisplay(message, isError = false) {
+          const logEntry = document.createElement("div");
+          logEntry.className = `log-entry ${
+            isError ? "log-error" : "log-info"
+          }`;
+
+          const timeSpan = document.createElement("span");
+          timeSpan.className = "log-time";
+          timeSpan.textContent = this.formatTime();
+
+          logEntry.appendChild(timeSpan);
+          logEntry.appendChild(document.createTextNode(message));
+
+          this.displayElement.appendChild(logEntry);
+          this.displayElement.scrollTop = this.displayElement.scrollHeight;
+        }
+
+        log(message, ...data) {
+          console.log(message, ...data);
+          let displayMessage = message;
+          if (data.length) {
+            try {
+              displayMessage +=
+                " " +
+                data
+                  .map((item) =>
+                    typeof item === "object"
+                      ? JSON.stringify(item)
+                      : String(item),
+                  )
+                  .join(" ");
+            } catch (e) {
+              displayMessage += " [Complex object]";
+            }
+          }
+          this.appendToDisplay(displayMessage);
+        }
+
+        error(message, ...data) {
+          console.error(message, ...data);
+          let displayMessage = message;
+          if (data.length) {
+            try {
+              displayMessage +=
+                " " +
+                data
+                  .map((item) =>
+                    typeof item === "object"
+                      ? JSON.stringify(item)
+                      : String(item),
+                  )
+                  .join(" ");
+            } catch (e) {
+              displayMessage += " [Complex object]";
+            }
+          }
+          this.appendToDisplay(displayMessage, true);
+        }
+      }
+
+      // Create logger instance
+      const logger = new DisplayLogger(statusDisplay);
+
+      // Clear logs button handler
+      clearLogsBtn.addEventListener("click", () => {
+        statusDisplay.innerHTML = "";
+        logger.log("Logs cleared");
+      });
 
       // Player instance reference
       let player = null;
@@ -76,7 +197,8 @@
           player.disconnect();
           player = null;
           connectButton.textContent = "Connect";
-          statusDisplay.textContent = "Disconnected";
+          connectionStatus.textContent = "Disconnected";
+          logger.log("Disconnected from server");
           return;
         }
 
@@ -84,21 +206,23 @@
         const url = urlInput.value.trim();
 
         if (!url) {
-          statusDisplay.textContent = "Error: Please enter a WebSocket URL";
+          connectionStatus.textContent = "Error: Please enter a WebSocket URL";
+          logger.error("No WebSocket URL provided");
           return;
         }
 
         try {
-          // Create and connect the player
-          player = new Player(url);
+          // Create and connect the player with our custom logger
+          player = new Player(url, logger);
           player.connect();
 
           // Update UI
           connectButton.textContent = "Disconnect";
-          statusDisplay.textContent = `Connected to ${url}`;
+          connectionStatus.textContent = `Connected to ${url}`;
+          logger.log(`Attempting connection to ${url}`);
         } catch (error) {
-          statusDisplay.textContent = `Error: ${error}`;
-          console.error("Connection error:", error);
+          connectionStatus.textContent = `Error: ${error}`;
+          logger.error("Connection error:", error);
         }
       });
     </script>
