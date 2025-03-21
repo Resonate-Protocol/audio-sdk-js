@@ -17,13 +17,15 @@ export const CODEC_MAP: Record<number, string> = {
 export interface PlayerInfo {
   playerId: string;
   name: string;
-  supportedCodecs: string[];
-  channels: number[];
-  sampleRates: number[];
-  bitDepth: number[];
   role: string;
-  supportedStreams: string[];
-  mediaFormats: string[];
+  bufferCapacity: number;
+  supportCodecs: string[];
+  supportChannels: number[];
+  supportSampleRates: number[];
+  supportBitDepth: number[];
+  supportStreams: string[];
+  supportPictureFormats: string[];
+  mediaDisplaySize: string | null;
 }
 
 export interface PlayerHelloMessage {

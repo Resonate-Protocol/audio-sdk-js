@@ -4,6 +4,7 @@ import {
   ServerMessages,
   BinaryMessageType,
   CODEC_MAP,
+  PlayerHelloMessage,
 } from "./messages.js";
 import { Logger } from "./logging.js";
 
@@ -52,18 +53,20 @@ export class Player {
 
   // Send a hello message to the server with player details.
   sendHello() {
-    const helloMsg = {
+    const helloMsg: PlayerHelloMessage = {
       type: "player/hello",
       payload: {
         playerId: "unique_player_id", // replace with a unique id as needed
         name: "PlayerClient",
-        supportedCodecs: ["pcm"],
-        channels: [2],
-        sampleRates: [44100],
-        bitDepth: [16],
         role: "player",
-        supportedStreams: ["music"],
-        mediaFormats: ["image/jpeg", "image/png"],
+        supportCodecs: ["pcm"],
+        supportChannels: [2],
+        supportSampleRates: [44100],
+        supportBitDepth: [16],
+        supportStreams: ["music"],
+        supportPictureFormats: ["image/jpeg", "image/png"],
+        mediaDisplaySize: null,
+        bufferCapacity: 10000000000,
       },
     };
     this.ws!.send(JSON.stringify(helloMsg));
