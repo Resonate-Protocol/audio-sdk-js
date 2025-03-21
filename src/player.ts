@@ -204,15 +204,12 @@ export class Player {
 
     // Bytes 2-5: timestamp (big-endian unsigned integer)
     const startTimeAtServer = dataView.getUint32(2, false);
-    // Bytes 6-9: duration in milliseconds (big-endian unsigned integer)
-    const chunkDurationMs = dataView.getUint32(6, false);
+
+    // Bytes 6-9: sample count (big-endian unsigned integer) - replaces duration in ms
+    const sampleCount = dataView.getUint32(6, false);
 
     // Header size in bytes
     const headerSize = 10;
-
-    this.logger.log(
-      `Received audio chunk: codec=${codecString}, timestamp=${startTimeAtServer}, duration=${chunkDurationMs}ms`,
-    );
 
     // Check if AudioContext is available
     if (!this.audioContext) {
@@ -228,9 +225,28 @@ export class Player {
     const { sampleRate, channels, bitDepth } = this.sessionInfo;
     const bytesPerSample = 2;
 
-    // Calculate the total number of samples per channel
-    const totalSamples =
-      (data.byteLength - headerSize) / (bytesPerSample * channels);
+    // Calculate duration in milliseconds from sample count and sample rate
+    const durationMs = (sampleCount / sampleRate) * 1000;
+
+    this.logger.log(
+      `Received audio chunk: codec=${codecString}, timestamp=${startTimeAtServer}, samples=${sampleCount}, duration=${durationMs.toFixed(
+        2,
+      )}ms`,
+    );
+
+    // Calculate the total number of samples per channel - now we directly use the sample count
+    const totalSamples = sampleCount;
+
+    // Verify that the number of samples matches the data size
+    const expectedDataSize = totalSamples * channels * bytesPerSample;
+    const actualDataSize = data.byteLength - headerSize;
+
+    if (expectedDataSize !== actualDataSize) {
+      this.logger.error(
+        `Data size mismatch: expected ${expectedDataSize} bytes, got ${actualDataSize} bytes`,
+      );
+      return;
+    }
 
     // Create an AudioBuffer to hold the PCM data
     const audioBuffer = this.audioContext.createBuffer(
@@ -293,7 +309,9 @@ export class Player {
       this.logger.log(
         `Scheduling audio to play in ${scheduleDelay.toFixed(
           3,
-        )}s at ${startTimeInAudioContext.toFixed(3)}s`,
+        )}s at ${startTimeInAudioContext.toFixed(
+          3,
+        )}s (${totalSamples} samples)`,
       );
       source.start(startTimeInAudioContext);
     }
