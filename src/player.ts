@@ -165,48 +165,50 @@ export class Player {
 
   // Handle binary messages – here we assume binary messages are audio chunks.
   handleBinaryMessage(data: ArrayBuffer) {
-    // Convert the ArrayBuffer to a Uint8Array for byte-level processing.
-    const bytes = new Uint8Array(data);
-    // Byte 0: message type – assume 1 indicates an audio chunk.
-    const messageType = bytes[0];
+    // Create a DataView for accessing binary data
+    const dataView = new DataView(data);
+
+    // Byte 0: message type
+    const messageType = dataView.getUint8(0);
 
     switch (messageType) {
       case BinaryMessageType.PlayAudioChunk:
         this.handleAudioChunk(data);
         break;
       default:
-        console.warn("Unknown binary message type:", messageType);
+        this.logger.error("Unknown binary message type:", messageType);
     }
   }
 
   // Handle an audio chunk binary message.
   handleAudioChunk(data: ArrayBuffer) {
-    // Convert the ArrayBuffer to a Uint8Array for byte-level processing.
-    const bytes = new Uint8Array(data);
+    // Create a DataView for accessing binary data
+    const dataView = new DataView(data);
 
-    // Byte 1: codec from the binary message header.
-    const codecByteValue = bytes[1];
+    // Byte 1: codec from the binary message header
+    const codecByteValue = dataView.getUint8(1);
     const codecString = CODEC_MAP[codecByteValue];
 
     if (!codecString) {
-      console.warn(`Unknown codec identifier: ${codecByteValue}`);
+      this.logger.error(`Unknown codec identifier: ${codecByteValue}`);
       return;
     }
 
     // Verify that the current session codec matches the binary message codec.
     if (this.sessionInfo && this.sessionInfo.codec !== codecString) {
-      console.warn(
+      this.logger.error(
         `Codec mismatch: session codec is ${this.sessionInfo.codec} but received binary codec ${codecString}`,
       );
       return;
     }
 
     // Bytes 2-5: timestamp (big-endian unsigned integer)
-    const startTimeAtServer = new DataView(data).getUint32(2, false);
+    const startTimeAtServer = dataView.getUint32(2, false);
     // Bytes 6-9: duration in milliseconds (big-endian unsigned integer)
-    const chunkDurationMs = new DataView(data).getUint32(6, false);
-    // The remainder of the data is the raw audio payload.
-    const audioData = data.slice(10);
+    const chunkDurationMs = dataView.getUint32(6, false);
+
+    // Header size in bytes
+    const headerSize = 10;
 
     this.logger.log(
       `Received audio chunk: codec=${codecString}, timestamp=${startTimeAtServer}, duration=${chunkDurationMs}ms`,
@@ -214,11 +216,11 @@ export class Player {
 
     // Check if AudioContext is available
     if (!this.audioContext) {
-      console.warn("Cannot play audio: AudioContext not initialized");
+      this.logger.error("Cannot play audio: AudioContext not initialized");
       return;
     }
     if (!this.sessionInfo) {
-      console.warn("Cannot play audio: session information not available");
+      this.logger.error("Cannot play audio: session information not available");
       return;
     }
 
@@ -226,23 +228,23 @@ export class Player {
     const { sampleRate, channels, bitDepth } = this.sessionInfo;
     const bytesPerSample = 2;
 
-    // Calculate the total number of samples per channel.
-    const totalSamples = data.byteLength / (bytesPerSample * channels);
+    // Calculate the total number of samples per channel
+    const totalSamples =
+      (data.byteLength - headerSize) / (bytesPerSample * channels);
 
-    // Create an AudioBuffer to hold the PCM data.
+    // Create an AudioBuffer to hold the PCM data
     const audioBuffer = this.audioContext.createBuffer(
       channels,
       totalSamples,
       sampleRate,
     );
-    const dataView = new DataView(data);
 
-    // Decode the interleaved 16-bit PCM data for each channel.
+    // Decode the interleaved 16-bit PCM data for each channel
     for (let channel = 0; channel < channels; channel++) {
       const channelData = audioBuffer.getChannelData(channel);
       for (let i = 0; i < totalSamples; i++) {
-        // Calculate the byte offset for this sample.
-        const offset = (i * channels + channel) * bytesPerSample;
+        // Calculate the byte offset for this sample (accounting for header)
+        const offset = headerSize + (i * channels + channel) * bytesPerSample;
         const sample = dataView.getInt16(offset, true); // little-endian
         // Convert the 16-bit PCM value to a float in the range [-1, 1]
         channelData[i] = sample / 32768;
@@ -264,7 +266,7 @@ export class Player {
 
     if (scheduleDelay < 0) {
       // We're late, log the issue but still play the audio immediately
-      console.warn(
+      this.logger.error(
         `Audio chunk arrived ${(-scheduleDelay).toFixed(3)}s too late`,
       );
       source.start();
