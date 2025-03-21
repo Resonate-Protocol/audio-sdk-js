@@ -28,11 +28,14 @@ interface PlayerHelloMessage {
   };
 }
 
+interface SourceInfo {
+  sourceId: string;
+  name: string;
+}
+
 interface SourceHelloMessage {
   type: "source/hello";
-  payload: {
-    sourceId: string;
-  };
+  payload: SourceInfo;
 }
 
 interface SessionStartMessage {
@@ -55,17 +58,12 @@ enum BinaryMessageType {
 }
 
 export class Player {
-  private url: string;
   private ws: WebSocket | null = null;
-  private audioContext: AudioContext | null = null;
+  private sourceInfo: SourceInfo | null = null;
   private sessionInfo: SessionInfo | null = null;
+  private audioContext: AudioContext | null = null;
 
-  constructor(url: string) {
-    this.url = url;
-    this.ws = null;
-    // AudioContext will be initialized during session start
-    this.sessionInfo = null;
-  }
+  constructor(public url: string) {}
 
   // Establish a WebSocket connection
   connect() {
@@ -125,7 +123,8 @@ export class Player {
     console.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
-        // Process source hello message if needed.
+        console.log("Source connected:", this.sourceInfo);
+        this.sourceInfo = message.payload;
         break;
       case "session/start":
         console.log("Session started", message.payload);
@@ -188,23 +187,28 @@ export class Player {
       `Received audio chunk: codec=${codecString}, timestamp=${timestamp}, duration=${duration}ms`,
     );
 
-    this.playAudioChunk(audioData);
+    this.playAudioChunk(timestamp, duration, audioData);
   }
 
   // Decode and play the audio chunk.
-  playAudioChunk(arrayBuffer) {
+  playAudioChunk(
+    timestamp: number,
+    duration: number,
+    arrayBuffer: ArrayBuffer,
+  ) {
     // Check if AudioContext is available
     if (!this.audioContext) {
       console.warn("Cannot play audio: AudioContext not initialized");
       return;
     }
+    if (!this.sessionInfo) {
+      console.warn("Cannot play audio: session information not available");
+      return;
+    }
 
     // Use session parameters if available; otherwise, use defaults.
-    const sampleRate =
-      (this.sessionInfo && this.sessionInfo.sampleRate) || 44100;
-    const channels = (this.sessionInfo && this.sessionInfo.channels) || 2;
-    const bitDepth = (this.sessionInfo && this.sessionInfo.bitDepth) || 16;
-    const bytesPerSample = bitDepth === 16 ? 2 : 2; // adjust if using a different bit depth
+    const { sampleRate, channels, bitDepth } = this.sessionInfo;
+    const bytesPerSample = 2;
 
     // Calculate the total number of samples per channel.
     const totalSamples = arrayBuffer.byteLength / (bytesPerSample * channels);
@@ -238,12 +242,18 @@ export class Player {
 
   // Close the WebSocket connection and clean up resources.
   disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    if (!this.ws) {
+      return;
     }
+    this.ws.close();
+    this.ws = null;
+    this.sourceInfo = null;
+    this.sessionInfo = null;
+
     if (this.audioContext && this.audioContext.state !== "closed") {
       this.audioContext.close();
     }
+
+    this.audioContext = null;
   }
 }
