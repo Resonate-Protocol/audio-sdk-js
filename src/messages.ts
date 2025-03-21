@@ -13,19 +13,21 @@ export const CODEC_MAP: Record<number, string> = {
   3: "aac",
 };
 
+export interface PlayerInfo {
+  playerId: string;
+  name: string;
+  supportedCodecs: string[];
+  channels: number[];
+  sampleRates: number[];
+  bitDepth: number[];
+  role: string;
+  supportedStreams: string[];
+  mediaFormats: string[];
+}
+
 export interface PlayerHelloMessage {
   type: "player/hello";
-  payload: {
-    playerId: string;
-    name: string;
-    supportedCodecs: string[];
-    channels: number[];
-    sampleRates: number[];
-    bitDepth: number[];
-    role: string;
-    supportedStreams: string[];
-    mediaFormats: string[];
-  };
+  payload: PlayerInfo;
 }
 
 export interface SourceInfo {
