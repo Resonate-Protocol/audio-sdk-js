@@ -4,8 +4,8 @@ import {
   ServerMessages,
   BinaryMessageType,
   CODEC_MAP,
-} from "./messages";
-import { Logger } from "./logging";
+} from "./messages.js";
+import { Logger } from "./logging.js";
 
 export class Player {
   private ws: WebSocket | null = null;
@@ -117,6 +117,8 @@ export class Player {
     // Byte 0: message type
     const messageType = dataView.getUint8(0);
 
+    this.logger.log("Received binary message", messageType);
+
     switch (messageType) {
       case BinaryMessageType.PlayAudioChunk:
         this.handleAudioChunk(data);
@@ -149,13 +151,14 @@ export class Player {
     }
 
     // Bytes 2-5: timestamp (big-endian unsigned integer)
-    const startTimeAtServer = dataView.getUint32(2, false);
+    const startTimeAtServer = Number(dataView.getBigUint64(2, false));
 
     // Bytes 6-9: sample count (big-endian unsigned integer) - replaces duration in ms
-    const sampleCount = dataView.getUint32(6, false);
+    const sampleCount = dataView.getUint32(10, false);
 
     // Header size in bytes
-    const headerSize = 10;
+    const headerSize = 14;
+    console.log("HEADER", data.slice(0, 10));
 
     // Check if AudioContext is available
     if (!this.audioContext) {
@@ -239,6 +242,15 @@ export class Player {
     // Convert server timestamp (milliseconds) to AudioContext time (seconds)
     const startTimeInAudioContext =
       startTimeAtServer / 1000 - this.serverTimeDiff;
+    // TODO startTimeAtServer is wrong.
+    // const startTimeInAudioContext = this.audioContext.currentTime;
+
+    console.log({
+      startTimeAtServer,
+      serverTimeDiff: this.serverTimeDiff,
+      audioContextTime: this.audioContext.currentTime,
+      startTimeInAudioContext,
+    });
 
     // Calculate how much time we have before this chunk should play
     const scheduleDelay =

@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "name": "improv-audio",
   "version": "1.0.0",
   "description": "Play audio from JavaScript",

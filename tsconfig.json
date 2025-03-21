@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "moduleResolution": "nodenext",
+    "moduleResolution": "node",
     "target": "es2018",
-    "module": "NodeNext",
+    "module": "ES2020",
     "declaration": true,
     "outDir": "./dist",
     "strict": true,

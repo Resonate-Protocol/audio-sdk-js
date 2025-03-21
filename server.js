@@ -1,15 +1,20 @@
-const { Source } = require("./dist/source"); // Assuming TypeScript is compiled to dist/
-const fs = require("fs");
-const path = require("path");
+import { Source } from "./dist/source.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // Configuration
-const PORT = 8080;
-const WAV_FILE = path.join(__dirname, "sample.wav");
-const REPLAY_INTERVAL = 5000; // Replay WAV file every 5 seconds
+const PORT = 3001;
+const WAV_FILE = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "sample.wav",
+);
+const REPLAY_INTERVAL = 10000; // Replay WAV file every 5 seconds
 
 // Create a simple logger that mirrors the Logger interface from source.ts
 const logger = {
-  log: (...args) => console.log(new Date().toISOString(), ...args),
+  log: (...args) =>
+    args[0] ? console.log(new Date().toISOString(), ...args) : console.log(""),
   error: (...args) =>
     console.error(new Date().toISOString(), "ERROR:", ...args),
 };
@@ -75,31 +80,35 @@ async function main() {
 
     // Start audio session and stream periodically
     setTimeout(() => {
-      // Start an audio session with parameters from the WAV file
-      if (
+      const playAudio = () => {
+        logger.log("");
+        logger.log("Sending WAV audio data to connected clients");
         source.startSession(
           "pcm",
           wavData.sampleRate,
           wavData.channels,
           wavData.bitDepth,
-        )
-      ) {
-        logger.log("Audio session started successfully");
+        );
+        source.sendPCMAudioChunk(
+          wavData.audioData,
+          // play in 500ms
+          Date.now() + 500,
+        );
+        // source.sendPCMAudioChunk(
+        //   wavData.audioData,
+        //   // play in 5500ms
+        //   Date.now() + 5500,
+        // );
+        // end session after audio is done playing.
+        setTimeout(() => source.endSession(), 5500);
+        // setTimeout(() => source.endSession(), 10500);
+      };
 
-        // Function to send audio data
-        const playAudio = () => {
-          logger.log("Sending WAV audio data to connected clients");
-          source.sendPCMAudioChunk(wavData.audioData);
-        };
+      // Play immediately once
+      playAudio();
 
-        // Play immediately once
-        playAudio();
-
-        // Then play periodically so new clients will eventually hear the audio
-        setInterval(playAudio, REPLAY_INTERVAL);
-      } else {
-        logger.error("Failed to start audio session");
-      }
+      // Then play periodically so new clients will eventually hear the audio
+      setInterval(playAudio, REPLAY_INTERVAL);
     }, 1000); // Short delay to ensure server is fully started
 
     // Handle process termination

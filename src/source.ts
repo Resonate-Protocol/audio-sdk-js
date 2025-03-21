@@ -7,21 +7,19 @@ import {
   SessionEndMessage,
   ServerMessages,
   ClientMessages,
-} from "./messages";
-import { Logger } from "./logging";
-import * as WebSocket from "ws";
+} from "./messages.js";
+import { Logger } from "./logging.js";
+import { WebSocketServer, WebSocket, Data } from "ws";
 import { IncomingMessage } from "http";
-import { Player } from "./player";
 
 interface ExtendedPlayerInfo extends PlayerInfo {
   clientId: string;
 }
 
 export class Source {
-  private server: WebSocket.Server | null = null;
+  private server: WebSocketServer | null = null;
   private clients: Map<string, WebSocket> = new Map();
   private players: Map<string, ExtendedPlayerInfo> = new Map();
-  private sessionActive: boolean = false;
   private sessionInfo: SessionInfo | null = null;
   private sourceInfo: SourceInfo;
 
@@ -40,7 +38,7 @@ export class Source {
   // Start the WebSocket server
   start() {
     try {
-      this.server = new WebSocket.Server({ port: this.port });
+      this.server = new WebSocketServer({ port: this.port });
       this.logger.log(`WebSocket server started on port ${this.port}`);
 
       this.server.on("connection", this.handleConnection.bind(this));
@@ -84,11 +82,7 @@ export class Source {
   }
 
   // Handle incoming messages from clients
-  private handleClientMessage(
-    clientId: string,
-    ws: WebSocket,
-    message: WebSocket.Data,
-  ) {
+  private handleClientMessage(clientId: string, ws: WebSocket, message: Data) {
     if (typeof message === "string") {
       try {
         const parsedMessage = JSON.parse(message);
@@ -147,7 +141,7 @@ export class Source {
       return false;
     }
 
-    if (this.sessionActive) {
+    if (this.sessionInfo) {
       this.logger.error("Session already active");
       return false;
     }
@@ -169,10 +163,6 @@ export class Source {
     };
 
     this.broadcastMessage(sessionStartMessage);
-    this.logger.log("Broadcasted session/start:", sessionStartMessage);
-
-    this.sessionActive = true;
-    return true;
   }
 
   // End the audio session
@@ -182,25 +172,26 @@ export class Source {
       return;
     }
 
-    if (!this.sessionActive) {
-      this.logger.error("No active session");
-      return;
+    if (!this.sessionInfo) {
+      this.logger.error("No session active");
     }
 
     // Send session end message
     const sessionEndMessage: SessionEndMessage = {
       type: "session/end",
+      payload: {
+        sessionId: this.sessionInfo!.sessionId,
+      },
     };
 
     this.broadcastMessage(sessionEndMessage);
-    this.logger.log("Broadcasted session/end:", sessionEndMessage);
 
-    this.sessionActive = false;
     this.sessionInfo = null;
   }
 
   // Broadcast a message to all connected clients
   private broadcastMessage(message: ServerMessages) {
+    this.logger.log("Broadcasted:", message);
     const messageString = JSON.stringify(message);
     for (const ws of this.clients.values()) {
       if (ws.readyState === WebSocket.OPEN) {
@@ -216,7 +207,7 @@ export class Source {
       return;
     }
 
-    if (!this.sessionActive || !this.sessionInfo) {
+    if (!this.sessionInfo) {
       this.logger.error("No active session");
       return;
     }
@@ -249,7 +240,7 @@ export class Source {
     const sampleCount = audioData[0].length;
 
     // Calculate header size and total message size
-    const headerSize = 10;
+    const headerSize = 14;
     const bytesPerSample = bitDepth / 8;
     const dataSize = sampleCount * channels * bytesPerSample;
     const totalSize = headerSize + dataSize;
@@ -261,8 +252,16 @@ export class Source {
     // Write header
     dataView.setUint8(0, BinaryMessageType.PlayAudioChunk); // Message type
     dataView.setUint8(1, codecByteValue); // Codec
-    dataView.setUint32(2, timestamp, false); // Timestamp (big-endian)
-    dataView.setUint32(6, sampleCount, false); // Sample count (big-endian)
+    console.log("Encoding timestamp", timestamp);
+    console.log("HEADER", buffer.slice(0, 10));
+    dataView.setBigUint64(2, BigInt(timestamp), false);
+    console.log("WRITTEN TS", Number(dataView.getBigUint64(2, false)));
+
+    // dataView.setUint32(2, timestamp, false); // Timestamp (big-endian)
+    // console.log("WRITTEN TS", dataView.getUint32(2, false));
+    console.log("HEADER", buffer.slice(0, 10));
+    dataView.setUint32(10, sampleCount, false); // Sample count (big-endian)
+    console.log("HEADER", buffer.slice(0, 10));
 
     // Write audio data
     for (let i = 0; i < sampleCount; i++) {
@@ -325,7 +324,7 @@ export class Source {
 
   // Stop the WebSocket server
   stop() {
-    if (this.sessionActive) {
+    if (this.sessionInfo) {
       this.endSession();
     }
 

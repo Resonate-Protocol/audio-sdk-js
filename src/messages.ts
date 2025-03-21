@@ -48,6 +48,9 @@ export interface SessionStartMessage {
 
 export interface SessionEndMessage {
   type: "session/end";
+  payload: {
+    sessionId: string;
+  };
 }
 
 export type ClientMessages = PlayerHelloMessage;
