@@ -4,7 +4,7 @@ export interface SessionInfo {
   sampleRate: number;
   channels: number;
   bitDepth: number;
-  now: number;
+  now: number; // in ms
 }
 
 // Binary codec identifier mapping (byte value to string representation)
