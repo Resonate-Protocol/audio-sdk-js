@@ -4,15 +4,19 @@
   "description": "Play audio from JavaScript",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch",
+    "serve": "serve -l 3000 .",
+    "dev": "concurrently \"tsc --watch\" \"serve -l 3000 .\"",
     "clean": "rimraf dist",
     "prepare": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "serve ."
   },
   "author": "Open Home Foundation",
   "license": "Apache-2.0",
   "devDependencies": {
+    "concurrently": "^8.2.0",
     "rimraf": "^5.0.0",
+    "serve": "^14.2.0",
     "typescript": "^5.0.0"
   }
 }

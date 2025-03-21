@@ -188,23 +188,23 @@ export class Player {
     }
 
     // Bytes 2-5: timestamp (big-endian unsigned integer)
-    const timestamp = new DataView(data).getUint32(2, false);
+    const startTime = new DataView(data).getUint32(2, false);
     // Bytes 6-9: duration in milliseconds (big-endian unsigned integer)
-    const duration = new DataView(data).getUint32(6, false);
+    const durationMs = new DataView(data).getUint32(6, false);
     // The remainder of the data is the raw audio payload.
     const audioData = data.slice(10);
 
     console.log(
-      `Received audio chunk: codec=${codecString}, timestamp=${timestamp}, duration=${duration}ms`,
+      `Received audio chunk: codec=${codecString}, timestamp=${startTime}, duration=${durationMs}ms`,
     );
 
-    this.playAudioChunk(timestamp, duration, audioData);
+    this.playAudioChunk(startTime, durationMs, audioData);
   }
 
   // Decode and play the audio chunk.
   playAudioChunk(
     startTimeAtServer: number,
-    chunkDuration: number,
+    chunkDurationMs: number,
     arrayBuffer: ArrayBuffer,
   ) {
     // Check if AudioContext is available
