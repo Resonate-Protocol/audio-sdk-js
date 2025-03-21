@@ -1,10 +1,14 @@
-// Define the session information interface
-export interface SessionInfo {
+interface SessionInfo {
   codec: string;
   sampleRate: number;
   channels: number;
   bitDepth: number;
   now: number; // in ms
+}
+
+interface Logger {
+  log: (message: string, ...data: any) => void;
+  error: (message: string, ...data: any) => void;
 }
 
 // Binary codec identifier mapping (byte value to string representation)
@@ -65,7 +69,7 @@ export class Player {
   private audioContext: AudioContext | null = null;
   private serverTimeDiff: number = 0; // Time difference between server and client
 
-  constructor(public url: string) {}
+  constructor(public url: string, private logger: Logger = console) {}
 
   // Establish a WebSocket connection
   connect() {
@@ -74,7 +78,7 @@ export class Player {
     this.ws.binaryType = "arraybuffer";
 
     this.ws.onopen = () => {
-      console.log("WebSocket connected");
+      this.logger.log("WebSocket connected");
       this.sendHello();
     };
 
@@ -85,7 +89,7 @@ export class Player {
           const message = JSON.parse(event.data);
           this.handleTextMessage(message);
         } catch (err) {
-          console.error("Error parsing message", err);
+          this.logger.error("Error parsing message", err);
         }
       } else {
         this.handleBinaryMessage(event.data);
@@ -93,11 +97,11 @@ export class Player {
     };
 
     this.ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
+      this.logger.error("WebSocket error:", error);
     };
 
     this.ws.onclose = () => {
-      console.log("WebSocket connection closed");
+      this.logger.log("WebSocket connection closed");
     };
   }
 
@@ -122,15 +126,15 @@ export class Player {
 
   // Handle text (JSON) messages from the server.
   handleTextMessage(message: TextMessage) {
-    console.log("Received text message:", message);
+    this.logger.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
         this.sourceInfo = message.payload;
-        console.log("Source connected:", this.sourceInfo);
+        this.logger.log("Source connected:", this.sourceInfo);
 
         break;
       case "session/start":
-        console.log("Session started", message.payload);
+        this.logger.log("Session started", message.payload);
         this.sessionInfo = message.payload;
 
         // Use standard AudioContext or fallback to webkitAudioContext
@@ -141,10 +145,10 @@ export class Player {
         // Convert server time to seconds for consistent unit with audioContext.currentTime
         this.serverTimeDiff =
           this.sessionInfo.now / 1000 - this.audioContext.currentTime;
-        console.log(`Server time difference: ${this.serverTimeDiff}s`);
+        this.logger.log(`Server time difference: ${this.serverTimeDiff}s`);
         break;
       case "session/end":
-        console.log("Session ended");
+        this.logger.log("Session ended");
         // Clean up AudioContext when the session ends
         if (this.audioContext && this.audioContext.state !== "closed") {
           this.audioContext.close();
@@ -155,7 +159,7 @@ export class Player {
         break;
       // Add additional case handlers as required.
       default:
-        console.log("Unhandled message type:", message.type);
+        this.logger.log("Unhandled message type:", message.type);
     }
   }
 
@@ -204,7 +208,7 @@ export class Player {
     // The remainder of the data is the raw audio payload.
     const audioData = data.slice(10);
 
-    console.log(
+    this.logger.log(
       `Received audio chunk: codec=${codecString}, timestamp=${startTimeAtServer}, duration=${chunkDurationMs}ms`,
     );
 
@@ -266,7 +270,7 @@ export class Player {
       source.start();
     } else {
       // Schedule the audio to play at the right time
-      console.log(
+      this.logger.log(
         `Scheduling audio to play in ${scheduleDelay.toFixed(
           3,
         )}s at ${startTimeInAudioContext.toFixed(3)}s`,
