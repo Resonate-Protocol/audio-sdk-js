@@ -4,6 +4,7 @@ export interface SessionInfo {
   sampleRate: number;
   channels: number;
   bitDepth: number;
+  now: number;
 }
 
 // Binary codec identifier mapping (byte value to string representation)
@@ -62,6 +63,7 @@ export class Player {
   private sourceInfo: SourceInfo | null = null;
   private sessionInfo: SessionInfo | null = null;
   private audioContext: AudioContext | null = null;
+  private serverTimeDiff: number = 0; // Time difference between server and client
 
   constructor(public url: string) {}
 
@@ -123,14 +125,20 @@ export class Player {
     console.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
-        console.log("Source connected:", this.sourceInfo);
         this.sourceInfo = message.payload;
+        console.log("Source connected:", this.sourceInfo);
+
         break;
       case "session/start":
         console.log("Session started", message.payload);
         this.sessionInfo = message.payload;
         this.audioContext = new (window.AudioContext ||
           window.webkitAudioContext)();
+
+        // Convert server time to seconds for consistent unit with audioContext.currentTime
+        this.serverTimeDiff =
+          this.sessionInfo.now / 1000 - this.audioContext.currentTime;
+        console.log(`Server time difference: ${this.serverTimeDiff}s`);
         break;
       case "session/end":
         console.log("Session ended");
@@ -192,8 +200,8 @@ export class Player {
 
   // Decode and play the audio chunk.
   playAudioChunk(
-    timestamp: number,
-    duration: number,
+    startTimeAtServer: number,
+    chunkDuration: number,
     arrayBuffer: ArrayBuffer,
   ) {
     // Check if AudioContext is available
@@ -206,7 +214,7 @@ export class Player {
       return;
     }
 
-    // Use session parameters if available; otherwise, use defaults.
+    // Use session parameters from the session info
     const { sampleRate, channels, bitDepth } = this.sessionInfo;
     const bytesPerSample = 2;
 
@@ -237,7 +245,30 @@ export class Player {
     const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(this.audioContext.destination);
-    source.start();
+
+    // Convert server timestamp (milliseconds) to AudioContext time (seconds)
+    const startTimeInAudioContext =
+      startTimeAtServer / 1000 - this.serverTimeDiff;
+
+    // Calculate how much time we have before this chunk should play
+    const scheduleDelay =
+      startTimeInAudioContext - this.audioContext.currentTime;
+
+    if (scheduleDelay < 0) {
+      // We're late, log the issue but still play the audio immediately
+      console.warn(
+        `Audio chunk arrived ${(-scheduleDelay).toFixed(3)}s too late`,
+      );
+      source.start();
+    } else {
+      // Schedule the audio to play at the right time
+      console.log(
+        `Scheduling audio to play in ${scheduleDelay.toFixed(
+          3,
+        )}s at ${startTimeInAudioContext.toFixed(3)}s`,
+      );
+      source.start(startTimeInAudioContext);
+    }
   }
 
   // Close the WebSocket connection and clean up resources.
