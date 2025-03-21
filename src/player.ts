@@ -55,7 +55,7 @@ type TextMessage =
   | SessionEndMessage;
 
 enum BinaryMessageType {
-  AudioChunk = 1,
+  PlayAudioChunk = 1,
 }
 
 export class Player {
@@ -165,10 +165,20 @@ export class Player {
     const bytes = new Uint8Array(data);
     // Byte 0: message type – assume 1 indicates an audio chunk.
     const messageType = bytes[0];
-    if (messageType !== BinaryMessageType.AudioChunk) {
-      console.warn("Unknown binary message type:", messageType);
-      return;
+
+    switch (messageType) {
+      case BinaryMessageType.PlayAudioChunk:
+        this.handleAudioChunk(data);
+        break;
+      default:
+        console.warn("Unknown binary message type:", messageType);
     }
+  }
+
+  // Handle an audio chunk binary message.
+  handleAudioChunk(data: ArrayBuffer) {
+    // Convert the ArrayBuffer to a Uint8Array for byte-level processing.
+    const bytes = new Uint8Array(data);
 
     // Byte 1: codec from the binary message header.
     const codecByteValue = bytes[1];
@@ -188,25 +198,16 @@ export class Player {
     }
 
     // Bytes 2-5: timestamp (big-endian unsigned integer)
-    const startTime = new DataView(data).getUint32(2, false);
+    const startTimeAtServer = new DataView(data).getUint32(2, false);
     // Bytes 6-9: duration in milliseconds (big-endian unsigned integer)
-    const durationMs = new DataView(data).getUint32(6, false);
+    const chunkDurationMs = new DataView(data).getUint32(6, false);
     // The remainder of the data is the raw audio payload.
     const audioData = data.slice(10);
 
     console.log(
-      `Received audio chunk: codec=${codecString}, timestamp=${startTime}, duration=${durationMs}ms`,
+      `Received audio chunk: codec=${codecString}, timestamp=${startTimeAtServer}, duration=${chunkDurationMs}ms`,
     );
 
-    this.playAudioChunk(startTime, durationMs, audioData);
-  }
-
-  // Decode and play the audio chunk.
-  playAudioChunk(
-    startTimeAtServer: number,
-    chunkDurationMs: number,
-    arrayBuffer: ArrayBuffer,
-  ) {
     // Check if AudioContext is available
     if (!this.audioContext) {
       console.warn("Cannot play audio: AudioContext not initialized");
@@ -222,7 +223,7 @@ export class Player {
     const bytesPerSample = 2;
 
     // Calculate the total number of samples per channel.
-    const totalSamples = arrayBuffer.byteLength / (bytesPerSample * channels);
+    const totalSamples = data.byteLength / (bytesPerSample * channels);
 
     // Create an AudioBuffer to hold the PCM data.
     const audioBuffer = this.audioContext.createBuffer(
@@ -230,7 +231,7 @@ export class Player {
       totalSamples,
       sampleRate,
     );
-    const dataView = new DataView(arrayBuffer);
+    const dataView = new DataView(data);
 
     // Decode the interleaved 16-bit PCM data for each channel.
     for (let channel = 0; channel < channels; channel++) {
