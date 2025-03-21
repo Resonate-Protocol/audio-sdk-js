@@ -1,11 +1,69 @@
+// Define the session information interface
+export interface SessionInfo {
+  codec: string;
+  sampleRate: number;
+  channels: number;
+  bitDepth: number;
+}
+
+// Binary codec identifier mapping (byte value to string representation)
+export const CODEC_MAP: Record<number, string> = {
+  1: "pcm",
+  2: "mp3",
+  3: "aac",
+};
+
+interface PlayerHelloMessage {
+  type: "player/hello";
+  payload: {
+    playerId: string;
+    name: string;
+    supportedCodecs: string[];
+    channels: number[];
+    sampleRates: number[];
+    bitDepth: number[];
+    role: string;
+    supportedStreams: string[];
+    mediaFormats: string[];
+  };
+}
+
+interface SourceHelloMessage {
+  type: "source/hello";
+  payload: {
+    sourceId: string;
+  };
+}
+
+interface SessionStartMessage {
+  type: "session/start";
+  payload: SessionInfo;
+}
+
+interface SessionEndMessage {
+  type: "session/end";
+}
+
+type TextMessage =
+  | PlayerHelloMessage
+  | SourceHelloMessage
+  | SessionStartMessage
+  | SessionEndMessage;
+
+enum BinaryMessageType {
+  AudioChunk = 1,
+}
+
 export class Player {
-  constructor(url) {
+  private url: string;
+  private ws: WebSocket | null = null;
+  private audioContext: AudioContext | null = null;
+  private sessionInfo: SessionInfo | null = null;
+
+  constructor(url: string) {
     this.url = url;
     this.ws = null;
-    // Create an AudioContext instance to play audio
-    this.audioContext = new (window.AudioContext ||
-      window.webkitAudioContext)();
-    // Stores session parameters such as codec, sampleRate, channels, etc.
+    // AudioContext will be initialized during session start
     this.sessionInfo = null;
   }
 
@@ -59,11 +117,11 @@ export class Player {
         mediaFormats: ["image/jpeg", "image/png"],
       },
     };
-    this.ws.send(JSON.stringify(helloMsg));
+    this.ws!.send(JSON.stringify(helloMsg));
   }
 
   // Handle text (JSON) messages from the server.
-  handleTextMessage(message) {
+  handleTextMessage(message: TextMessage) {
     console.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
@@ -71,17 +129,17 @@ export class Player {
         break;
       case "session/start":
         console.log("Session started", message.payload);
-        // Store session information from the server,
-        // including the chosen codec and any other parameters.
-        this.sessionInfo = {
-          codec: message.payload.codec,
-          sampleRate: message.payload.sampleRate || 44100,
-          channels: message.payload.channels || 2,
-          bitDepth: message.payload.bitDepth || 16,
-        };
+        this.sessionInfo = message.payload;
+        this.audioContext = new (window.AudioContext ||
+          window.webkitAudioContext)();
         break;
       case "session/end":
         console.log("Session ended");
+        // Clean up AudioContext when the session ends
+        if (this.audioContext && this.audioContext.state !== "closed") {
+          this.audioContext.close();
+          this.audioContext = null;
+        }
         // Clear session information when session ends.
         this.sessionInfo = null;
         break;
@@ -92,22 +150,29 @@ export class Player {
   }
 
   // Handle binary messages – here we assume binary messages are audio chunks.
-  handleBinaryMessage(data) {
+  handleBinaryMessage(data: ArrayBuffer) {
     // Convert the ArrayBuffer to a Uint8Array for byte-level processing.
     const bytes = new Uint8Array(data);
     // Byte 0: message type – assume 1 indicates an audio chunk.
     const messageType = bytes[0];
-    if (messageType !== 1) {
+    if (messageType !== BinaryMessageType.AudioChunk) {
       console.warn("Unknown binary message type:", messageType);
       return;
     }
 
     // Byte 1: codec from the binary message header.
-    const codecFromBinary = bytes[1];
+    const codecByteValue = bytes[1];
+    const codecString = CODEC_MAP[codecByteValue];
+
+    if (!codecString) {
+      console.warn(`Unknown codec identifier: ${codecByteValue}`);
+      return;
+    }
+
     // Verify that the current session codec matches the binary message codec.
-    if (this.sessionInfo && this.sessionInfo.codec !== codecFromBinary) {
+    if (this.sessionInfo && this.sessionInfo.codec !== codecString) {
       console.warn(
-        `Codec mismatch: session codec is ${this.sessionInfo.codec} but received binary codec ${codecFromBinary}`,
+        `Codec mismatch: session codec is ${this.sessionInfo.codec} but received binary codec ${codecString}`,
       );
       return;
     }
@@ -120,7 +185,7 @@ export class Player {
     const audioData = data.slice(10);
 
     console.log(
-      `Received audio chunk: codec=${codecFromBinary}, timestamp=${timestamp}, duration=${duration}ms`,
+      `Received audio chunk: codec=${codecString}, timestamp=${timestamp}, duration=${duration}ms`,
     );
 
     this.playAudioChunk(audioData);
@@ -128,6 +193,12 @@ export class Player {
 
   // Decode and play the audio chunk.
   playAudioChunk(arrayBuffer) {
+    // Check if AudioContext is available
+    if (!this.audioContext) {
+      console.warn("Cannot play audio: AudioContext not initialized");
+      return;
+    }
+
     // Use session parameters if available; otherwise, use defaults.
     const sampleRate =
       (this.sessionInfo && this.sessionInfo.sampleRate) || 44100;
