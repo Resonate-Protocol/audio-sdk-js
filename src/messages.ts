@@ -50,11 +50,12 @@ export interface SessionEndMessage {
   type: "session/end";
 }
 
-export type TextMessage =
-  | PlayerHelloMessage
-  | SourceHelloMessage
+export type ClientMessages = PlayerHelloMessage;
+
+export type ServerMessages =
   | SessionStartMessage
-  | SessionEndMessage;
+  | SessionEndMessage
+  | SourceHelloMessage;
 
 export enum BinaryMessageType {
   PlayAudioChunk = 1,

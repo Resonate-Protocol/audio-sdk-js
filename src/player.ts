@@ -1,7 +1,7 @@
 import {
   SourceInfo,
   SessionInfo,
-  TextMessage,
+  ServerMessages,
   BinaryMessageType,
   CODEC_MAP,
 } from "./messages";
@@ -70,7 +70,7 @@ export class Player {
   }
 
   // Handle text (JSON) messages from the server.
-  handleTextMessage(message: TextMessage) {
+  handleTextMessage(message: ServerMessages) {
     this.logger.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
@@ -104,6 +104,7 @@ export class Player {
         break;
       // Add additional case handlers as required.
       default:
+        // @ts-expect-error
         this.logger.log("Unhandled message type:", message.type);
     }
   }

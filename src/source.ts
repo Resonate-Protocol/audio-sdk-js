@@ -5,16 +5,22 @@ import {
   BinaryMessageType,
   CODEC_MAP,
   SessionEndMessage,
-  TextMessage,
+  ServerMessages,
+  ClientMessages,
 } from "./messages";
 import { Logger } from "./logging";
 import * as WebSocket from "ws";
 import { IncomingMessage } from "http";
+import { Player } from "./player";
+
+interface ExtendedPlayerInfo extends PlayerInfo {
+  clientId: string;
+}
 
 export class Source {
   private server: WebSocket.Server | null = null;
   private clients: Map<string, WebSocket> = new Map();
-  private players: Map<string, PlayerInfo> = new Map();
+  private players: Map<string, ExtendedPlayerInfo> = new Map();
   private sessionActive: boolean = false;
   private sessionInfo: SessionInfo | null = null;
   private sourceInfo: SourceInfo;
@@ -65,7 +71,7 @@ export class Source {
 
       // Find and remove any associated player
       for (const [playerId, playerInfo] of this.players.entries()) {
-        if (playerInfo.playerId === clientId) {
+        if (playerInfo.clientId === clientId) {
           this.players.delete(playerId);
           break;
         }
@@ -95,10 +101,10 @@ export class Source {
   }
 
   // Handle parsed messages
-  handleMessage(clientId: string, ws: WebSocket, message: any) {
+  handleMessage(clientId: string, ws: WebSocket, message: ClientMessages) {
     switch (message.type) {
       case "player/hello":
-        const playerInfo = message.payload;
+        const playerInfo = message.payload as ExtendedPlayerInfo;
         playerInfo.clientId = clientId; // Associate client ID with player
         this.handlePlayerHello(ws, playerInfo);
         break;
@@ -108,7 +114,7 @@ export class Source {
   }
 
   // Handle player hello message
-  handlePlayerHello(ws: WebSocket, playerInfo: PlayerInfo) {
+  handlePlayerHello(ws: WebSocket, playerInfo: ExtendedPlayerInfo) {
     this.logger.log("Player connected:", playerInfo);
 
     // Store player information
@@ -194,7 +200,7 @@ export class Source {
   }
 
   // Broadcast a message to all connected clients
-  private broadcastMessage(message: TextMessage) {
+  private broadcastMessage(message: ServerMessages) {
     const messageString = JSON.stringify(message);
     for (const ws of this.clients.values()) {
       if (ws.readyState === WebSocket.OPEN) {
