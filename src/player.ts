@@ -3,7 +3,6 @@ import {
   SessionInfo,
   ServerMessages,
   BinaryMessageType,
-  CODEC_MAP,
   PlayerHelloMessage,
 } from "./messages.js";
 import { Logger } from "./logging.js";

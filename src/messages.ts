@@ -8,13 +8,6 @@ export interface SessionInfo {
   codec_header: string | null;
 }
 
-// Binary codec identifier mapping (byte value to string representation)
-export const CODEC_MAP: Record<number, string> = {
-  1: "pcm",
-  2: "mp3",
-  3: "aac",
-};
-
 export interface PlayerInfo {
   player_id: string;
   name: string;

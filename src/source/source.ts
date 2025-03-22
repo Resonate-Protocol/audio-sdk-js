@@ -2,7 +2,6 @@ import {
   SourceInfo,
   SessionInfo,
   BinaryMessageType,
-  CODEC_MAP,
   SessionEndMessage,
   ServerMessages,
   ClientMessages,
@@ -174,20 +173,6 @@ export class Source {
       this.logger.error(
         `Channel mismatch: expected ${channels}, got ${audioData.length}`,
       );
-      return;
-    }
-
-    // Find codec byte value
-    let codecByteValue: number | undefined;
-    for (const [key, value] of Object.entries(CODEC_MAP)) {
-      if (value === codec) {
-        codecByteValue = Number(key);
-        break;
-      }
-    }
-
-    if (codecByteValue === undefined) {
-      this.logger.error("Invalid codec:", codec);
       return;
     }
 
