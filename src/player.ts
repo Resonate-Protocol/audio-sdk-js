@@ -56,17 +56,17 @@ export class Player {
     const helloMsg: PlayerHelloMessage = {
       type: "player/hello",
       payload: {
-        playerId: "unique_player_id", // replace with a unique id as needed
+        player_id: "unique_player_id", // replace with a unique id as needed
         name: "PlayerClient",
         role: "player",
-        supportCodecs: ["pcm"],
-        supportChannels: [2],
-        supportSampleRates: [44100],
-        supportBitDepth: [16],
-        supportStreams: ["music"],
-        supportPictureFormats: ["image/jpeg", "image/png"],
-        mediaDisplaySize: null,
-        bufferCapacity: 10000000000,
+        support_codecs: ["pcm"],
+        support_channels: [2],
+        support_sample_rates: [44100],
+        support_bit_depth: [16],
+        support_streams: ["music"],
+        support_picture_formats: ["jpeg", "png"],
+        media_display_size: null,
+        buffer_capacity: 10000000000,
       },
     };
     this.ws!.send(JSON.stringify(helloMsg));
@@ -95,6 +95,7 @@ export class Player {
           this.sessionInfo.now / 1000 - this.audioContext.currentTime;
         this.logger.log(`Server time difference: ${this.serverTimeDiff}s`);
         break;
+
       case "session/end":
         this.logger.log("Session ended");
         // Clean up AudioContext when the session ends
@@ -105,7 +106,7 @@ export class Player {
         // Clear session information when session ends.
         this.sessionInfo = null;
         break;
-      // Add additional case handlers as required.
+
       default:
         // @ts-expect-error
         this.logger.log("Unhandled message type:", message.type);
@@ -133,36 +134,6 @@ export class Player {
 
   // Handle an audio chunk binary message.
   handleAudioChunk(data: ArrayBuffer) {
-    // Create a DataView for accessing binary data
-    const dataView = new DataView(data);
-
-    // Byte 1: codec from the binary message header
-    const codecByteValue = dataView.getUint8(1);
-    const codecString = CODEC_MAP[codecByteValue];
-
-    if (!codecString) {
-      this.logger.error(`Unknown codec identifier: ${codecByteValue}`);
-      return;
-    }
-
-    // Verify that the current session codec matches the binary message codec.
-    if (this.sessionInfo && this.sessionInfo.codec !== codecString) {
-      this.logger.error(
-        `Codec mismatch: session codec is ${this.sessionInfo.codec} but received binary codec ${codecString}`,
-      );
-      return;
-    }
-
-    // Bytes 2-5: timestamp (big-endian unsigned integer)
-    const startTimeAtServer = Number(dataView.getBigUint64(2, false));
-
-    // Bytes 6-9: sample count (big-endian unsigned integer) - replaces duration in ms
-    const sampleCount = dataView.getUint32(10, false);
-
-    // Header size in bytes
-    const headerSize = 14;
-    console.log("HEADER", data.slice(0, 10));
-
     // Check if AudioContext is available
     if (!this.audioContext) {
       this.logger.error("Cannot play audio: AudioContext not initialized");
@@ -173,15 +144,32 @@ export class Player {
       return;
     }
 
+    // Create a DataView for accessing binary data
+    const dataView = new DataView(data);
+
+    // Bytes 2-5: timestamp (big-endian unsigned integer)
+    const startTimeAtServer = Number(dataView.getBigUint64(1, false));
+
+    // Bytes 6-9: sample count (big-endian unsigned integer) - replaces duration in ms
+    const sampleCount = dataView.getUint32(9, false);
+
+    // Header size in bytes
+    const headerSize = 13;
+
     // Use session parameters from the session info
-    const { sampleRate, channels, bitDepth } = this.sessionInfo;
+    const {
+      codec,
+      sample_rate: sampleRate,
+      channels,
+      bit_depth: bitDepth,
+    } = this.sessionInfo;
     const bytesPerSample = 2;
 
     // Calculate duration in milliseconds from sample count and sample rate
     const durationMs = (sampleCount / sampleRate) * 1000;
 
     this.logger.log(
-      `Received audio chunk: codec=${codecString}, timestamp=${startTimeAtServer}, samples=${sampleCount}, duration=${durationMs.toFixed(
+      `Received audio chunk: codec=${codec}, timestamp=${startTimeAtServer}, samples=${sampleCount}, duration=${durationMs.toFixed(
         2,
       )}ms`,
     );
@@ -207,7 +195,6 @@ export class Player {
       sampleRate,
     );
 
-    // Add a comment explaining why we need this manual conversion
     // We must manually process the audio data because:
     // 1. Web Audio API uses 32-bit float samples in range [-1,1]
     // 2. Our input is 16-bit PCM integers in an interleaved format
@@ -245,8 +232,6 @@ export class Player {
     // Convert server timestamp (milliseconds) to AudioContext time (seconds)
     const startTimeInAudioContext =
       startTimeAtServer / 1000 - this.serverTimeDiff;
-    // TODO startTimeAtServer is wrong.
-    // const startTimeInAudioContext = this.audioContext.currentTime;
 
     console.log({
       startTimeAtServer,

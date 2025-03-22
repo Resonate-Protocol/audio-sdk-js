@@ -112,10 +112,10 @@ export class Source {
     this.logger.log("Player connected:", playerInfo);
 
     // Store player information
-    this.players.set(playerInfo.playerId, playerInfo);
+    this.players.set(playerInfo.player_id, playerInfo);
 
     // Send source hello
-    this.sendSourceHello(ws, playerInfo.playerId);
+    this.sendSourceHello(ws, playerInfo.player_id);
   }
 
   // Send source hello message to player
@@ -148,12 +148,13 @@ export class Source {
 
     // Create session info
     this.sessionInfo = {
-      sessionId: this.generateUniqueId(),
+      session_id: this.generateUniqueId(),
       now: Date.now(), // Current timestamp in milliseconds
       codec,
-      sampleRate,
+      sample_rate: sampleRate,
       channels,
-      bitDepth,
+      bit_depth: bitDepth,
+      codec_header: null,
     };
 
     // Send session start message to all players
@@ -180,7 +181,7 @@ export class Source {
     const sessionEndMessage: SessionEndMessage = {
       type: "session/end",
       payload: {
-        sessionId: this.sessionInfo!.sessionId,
+        sessionId: this.sessionInfo!.session_id,
       },
     };
 
@@ -212,7 +213,12 @@ export class Source {
       return;
     }
 
-    const { channels, sampleRate, bitDepth, codec } = this.sessionInfo;
+    const {
+      channels,
+      sample_rate: sampleRate,
+      bit_depth: bitDepth,
+      codec,
+    } = this.sessionInfo;
 
     // Validate input
     if (audioData.length !== channels) {
@@ -240,7 +246,7 @@ export class Source {
     const sampleCount = audioData[0].length;
 
     // Calculate header size and total message size
-    const headerSize = 14;
+    const headerSize = 13;
     const bytesPerSample = bitDepth / 8;
     const dataSize = sampleCount * channels * bytesPerSample;
     const totalSize = headerSize + dataSize;
@@ -251,17 +257,8 @@ export class Source {
 
     // Write header
     dataView.setUint8(0, BinaryMessageType.PlayAudioChunk); // Message type
-    dataView.setUint8(1, codecByteValue); // Codec
-    console.log("Encoding timestamp", timestamp);
-    console.log("HEADER", buffer.slice(0, 10));
-    dataView.setBigUint64(2, BigInt(timestamp), false);
-    console.log("WRITTEN TS", Number(dataView.getBigUint64(2, false)));
-
-    // dataView.setUint32(2, timestamp, false); // Timestamp (big-endian)
-    // console.log("WRITTEN TS", dataView.getUint32(2, false));
-    console.log("HEADER", buffer.slice(0, 10));
-    dataView.setUint32(10, sampleCount, false); // Sample count (big-endian)
-    console.log("HEADER", buffer.slice(0, 10));
+    dataView.setBigUint64(1, BigInt(timestamp), false);
+    dataView.setUint32(9, sampleCount, false); // Sample count (big-endian)
 
     // Write audio data
     for (let i = 0; i < sampleCount; i++) {

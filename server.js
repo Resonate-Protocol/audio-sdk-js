@@ -76,8 +76,6 @@ async function main() {
       return;
     }
 
-    logger.log(`WebSocket server started on port ${PORT}`);
-
     // Start audio session and stream periodically
     setTimeout(() => {
       const playAudio = () => {
@@ -109,7 +107,7 @@ async function main() {
 
       // Then play periodically so new clients will eventually hear the audio
       setInterval(playAudio, REPLAY_INTERVAL);
-    }, 1000); // Short delay to ensure server is fully started
+    }, 10000); // Short delay to ensure server is fully started
 
     // Handle process termination
     process.on("SIGINT", () => {

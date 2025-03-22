@@ -1,10 +1,11 @@
 export interface SessionInfo {
-  sessionId: string;
+  session_id: string;
   codec: string;
-  sampleRate: number;
+  sample_rate: number;
   channels: number;
-  bitDepth: number;
+  bit_depth: number;
   now: number; // in ms
+  codec_header: string | null;
 }
 
 // Binary codec identifier mapping (byte value to string representation)
@@ -15,17 +16,17 @@ export const CODEC_MAP: Record<number, string> = {
 };
 
 export interface PlayerInfo {
-  playerId: string;
+  player_id: string;
   name: string;
   role: string;
-  bufferCapacity: number;
-  supportCodecs: string[];
-  supportChannels: number[];
-  supportSampleRates: number[];
-  supportBitDepth: number[];
-  supportStreams: string[];
-  supportPictureFormats: string[];
-  mediaDisplaySize: string | null;
+  buffer_capacity: number;
+  support_codecs: string[];
+  support_channels: number[];
+  support_sample_rates: number[];
+  support_bit_depth: number[];
+  support_streams: string[];
+  support_picture_formats: string[];
+  media_display_size: string | null;
 }
 
 export interface PlayerHelloMessage {
