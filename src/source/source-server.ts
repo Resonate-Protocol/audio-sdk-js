@@ -1,4 +1,4 @@
-import { SourceInfo, SessionInfo, ClientMessages } from "../messages.js";
+import { SourceInfo, ClientMessages } from "../messages.js";
 import { Logger } from "../logging.js";
 import { WebSocketServer } from "ws";
 import { SourceClient } from "./source-client.js";
@@ -8,15 +8,14 @@ import { generateUniqueId } from "../util/unique-id.js";
 
 export class SourceServer {
   private server: WebSocketServer | null = null;
-  private clients: Source;
-  private session: SourceSession | null = null;
+  private source: Source;
 
   constructor(
     name: string,
     public port: number,
     private logger: Logger = console,
   ) {
-    this.clients = new Source(
+    this.source = new Source(
       {
         source_id: generateUniqueId("source"),
         name,
@@ -31,7 +30,7 @@ export class SourceServer {
     this.logger.log(`WebSocket server started on port ${this.port}`);
 
     this.server.on("connection", (ws, request) =>
-      this.clients.handleConnection(ws, request),
+      this.source.handleConnection(ws, request),
     );
     this.server.on("error", (error) => {
       this.logger.error("WebSocket server error:", error);
@@ -44,7 +43,7 @@ export class SourceServer {
     // Handle special messages if needed
   }
 
-  // Start an audio session
+  // Start an audio session - delegates to Source
   startSession(
     codec: string = "pcm",
     sampleRate: number = 44100,
@@ -55,39 +54,14 @@ export class SourceServer {
       throw new Error("WebSocket server not started");
     }
 
-    if (this.session) {
-      throw new Error("Session already active");
-    }
-
-    // Create session info
-    const sessionInfo: SessionInfo = {
-      session_id: generateUniqueId("session"),
-      now: Date.now(), // Current timestamp in milliseconds
-      codec,
-      sample_rate: sampleRate,
-      channels,
-      bit_depth: bitDepth,
-      codec_header: null,
-    };
-
-    // Create new session with current clients from sourcePlayers
-    this.session = new SourceSession(
-      sessionInfo,
-      this.clients.getClients(),
-      this.logger,
-      () => {
-        // This callback is called when the session ends itself
-        this.session = null;
-      },
-    );
-
-    return this.session;
+    return this.source.startSession(codec, sampleRate, channels, bitDepth);
   }
 
   // Stop the WebSocket server
   stop() {
-    if (this.session) {
-      this.session.end();
+    const session = this.source.getSession();
+    if (session) {
+      session.end();
     }
 
     if (this.server) {

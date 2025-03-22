@@ -1,22 +1,20 @@
 import { WebSocket } from "ws";
 import { IncomingMessage } from "http";
 import { Logger } from "../logging.js";
-import { SourceInfo } from "../messages.js";
+import { SourceInfo, SessionInfo } from "../messages.js";
 import { SourceClient } from "./source-client.js";
+import { SourceSession } from "./source-session.js";
+import { generateUniqueId } from "../util/unique-id.js";
 
 export class Source {
   private clients: Map<string, SourceClient> = new Map();
+  private session: SourceSession | null = null;
 
   constructor(private sourceInfo: SourceInfo, private logger: Logger) {}
 
-  // Generate a unique ID for clients
-  private generateUniqueId(): string {
-    return `client_${Math.random().toString(36).substring(2, 9)}`;
-  }
-
   // Handle new client connections
   handleConnection(ws: WebSocket, request: IncomingMessage) {
-    const clientId = this.generateUniqueId();
+    const clientId = generateUniqueId("client");
     const playerClient = new SourceClient(clientId, ws, this, this.logger);
     this.clients.set(clientId, playerClient);
     this.logger.log(`Client connected: ${clientId}`);
@@ -40,5 +38,46 @@ export class Source {
 
   getSourceInfo(): SourceInfo {
     return this.sourceInfo;
+  }
+
+  // Start an audio session
+  startSession(
+    codec: string = "pcm",
+    sampleRate: number = 44100,
+    channels: number = 2,
+    bitDepth: number = 16,
+  ): SourceSession {
+    if (this.session) {
+      throw new Error("Session already active");
+    }
+
+    // Create session info
+    const sessionInfo: SessionInfo = {
+      session_id: generateUniqueId("session"),
+      now: Date.now(), // Current timestamp in milliseconds
+      codec,
+      sample_rate: sampleRate,
+      channels,
+      bit_depth: bitDepth,
+      codec_header: null,
+    };
+
+    // Create new session with current clients
+    this.session = new SourceSession(
+      sessionInfo,
+      this.getClients(),
+      this.logger,
+      () => {
+        // This callback is called when the session ends itself
+        this.session = null;
+      },
+    );
+
+    return this.session;
+  }
+
+  // Get current session if exists
+  getSession(): SourceSession | null {
+    return this.session;
   }
 }
