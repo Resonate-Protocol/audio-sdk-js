@@ -2,37 +2,20 @@ import {
   SessionInfo,
   BinaryMessageType,
   SessionEndMessage,
-  ServerMessages,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
 import { SourceClient } from "./source-client.js";
 
 export class SourceSession {
+  sessionActive: Set<string> = new Set();
+
   constructor(
     private readonly sessionInfo: SessionInfo,
     private readonly clients: Map<string, SourceClient>,
     private readonly logger: Logger,
     private readonly onSessionEnd: () => void,
-  ) {
-    // Send session start message to all players
-    const sessionStartMessage = {
-      type: "session/start" as const,
-      payload: this.sessionInfo,
-    };
+  ) {}
 
-    this.broadcastMessage(sessionStartMessage);
-    this.logger.log(`Session started: ${sessionInfo.session_id}`);
-  }
-
-  // Broadcast a message to all connected clients
-  private broadcastMessage(message: ServerMessages) {
-    this.logger.log("Broadcasting:", message);
-    for (const client of this.clients.values()) {
-      client.send(message);
-    }
-  }
-
-  // End the audio session
   end() {
     // Send session end message
     const sessionEndMessage: SessionEndMessage = {
@@ -42,13 +25,15 @@ export class SourceSession {
       },
     };
 
-    this.broadcastMessage(sessionEndMessage);
-    this.logger.log(`Session ended: ${this.sessionInfo.session_id}`);
+    for (const clientId of this.sessionActive) {
+      this.clients.get(clientId)?.send(sessionEndMessage);
+    }
+    this.sessionActive.clear();
     this.onSessionEnd();
   }
 
   // Send audio data to all players
-  sendAudio(audioData: Float32Array[], timestamp: number): void {
+  createAudioPacket(audioData: Float32Array[], timestamp: number): ArrayBuffer {
     const {
       channels,
       sample_rate: sampleRate,
@@ -94,13 +79,25 @@ export class SourceSession {
       }
     }
 
+    return buffer;
+  }
+
+  sendBinary(buffer: ArrayBuffer) {
     // Broadcast the binary message to all clients
     for (const client of this.clients.values()) {
+      if (!client.isReady) {
+        this.logger.log(`Client ${client.clientId} not ready, skipping`);
+        continue;
+      }
+      if (!this.sessionActive.has(client.clientId)) {
+        client.send({
+          type: "session/start" as const,
+          payload: this.sessionInfo,
+        });
+        this.sessionActive.add(client.clientId);
+      }
       client.sendBinary(buffer);
     }
-    this.logger.log(
-      `Broadcasted audio chunk: ${sampleCount} samples at timestamp ${timestamp}ms to ${this.clients.size} clients`,
-    );
   }
 
   // Create and send a PCM audio chunk from raw samples
@@ -130,7 +127,10 @@ export class SourceSession {
       floatData = [pcmData];
     }
 
-    this.sendAudio(floatData, timestamp);
+    this.sendBinary(this.createAudioPacket(floatData, timestamp));
+    this.logger.log(
+      `Broadcasted audio chunk: ${floatData[0].length} samples at timestamp ${timestamp}ms to ${this.clients.size} clients`,
+    );
   }
 
   getInfo(): SessionInfo {
