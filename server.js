@@ -99,7 +99,7 @@ async function main() {
         //   Date.now() + 5500,
         // );
         // end session after audio is done playing.
-        setTimeout(() => session.end(), 5500);
+        setTimeout(() => session.end(), 6500);
         // setTimeout(() => source.end(), 10500);
       };
 
