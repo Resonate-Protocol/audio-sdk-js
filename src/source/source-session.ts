@@ -4,7 +4,7 @@ import {
   SessionEndMessage,
   ServerMessages,
 } from "../messages.js";
-import { Logger } from "../logging.js";
+import type { Logger } from "../logging.js";
 import { SourceClient } from "./source-client.js";
 
 export class SourceSession {

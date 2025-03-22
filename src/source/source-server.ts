@@ -1,8 +1,7 @@
-import { SourceInfo, ClientMessages } from "../messages.js";
-import { Logger } from "../logging.js";
 import { WebSocketServer } from "ws";
-import { SourceClient } from "./source-client.js";
-import { SourceSession } from "./source-session.js";
+import type { ClientMessages } from "../messages.js";
+import type { Logger } from "../logging.js";
+import type { SourceSession } from "./source-session.js";
 import { Source } from "./source.js";
 import { generateUniqueId } from "../util/unique-id.js";
 

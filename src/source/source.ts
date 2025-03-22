@@ -1,10 +1,10 @@
 import { WebSocket } from "ws";
-import { IncomingMessage } from "http";
-import { Logger } from "../logging.js";
-import { SourceInfo, SessionInfo } from "../messages.js";
 import { SourceClient } from "./source-client.js";
-import { SourceSession } from "./source-session.js";
 import { generateUniqueId } from "../util/unique-id.js";
+import { SourceSession } from "./source-session.js";
+import type { IncomingMessage } from "http";
+import type { Logger } from "../logging.js";
+import type { SourceInfo, SessionInfo } from "../messages.js";
 
 export class Source {
   private clients: Map<string, SourceClient> = new Map();

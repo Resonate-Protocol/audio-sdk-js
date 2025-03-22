@@ -1,7 +1,11 @@
 import { WebSocket } from "ws";
-import { PlayerInfo, ServerMessages, ClientMessages } from "../messages.js";
-import { Logger } from "../logging.js";
-import { Source } from "./source.js";
+import type {
+  PlayerInfo,
+  ServerMessages,
+  ClientMessages,
+} from "../messages.js";
+import type { Logger } from "../logging.js";
+import type { Source } from "./source.js";
 
 export class SourceClient {
   public playerInfo: PlayerInfo | null = null;
