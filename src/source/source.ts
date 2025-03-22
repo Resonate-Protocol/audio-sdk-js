@@ -28,22 +28,15 @@ export class Source {
 
   // Start the WebSocket server
   start() {
-    try {
-      this.server = new WebSocketServer({ port: this.port });
-      this.logger.log(`WebSocket server started on port ${this.port}`);
+    this.server = new WebSocketServer({ port: this.port });
+    this.logger.log(`WebSocket server started on port ${this.port}`);
 
-      this.server.on("connection", (ws, request) =>
-        this.clients.handleConnection(ws, request),
-      );
-      this.server.on("error", (error) => {
-        this.logger.error("WebSocket server error:", error);
-      });
-
-      return true;
-    } catch (err) {
-      this.logger.error("Failed to start WebSocket server:", err);
-      return false;
-    }
+    this.server.on("connection", (ws, request) =>
+      this.clients.handleConnection(ws, request),
+    );
+    this.server.on("error", (error) => {
+      this.logger.error("WebSocket server error:", error);
+    });
   }
 
   // Register a player after it sends a hello message

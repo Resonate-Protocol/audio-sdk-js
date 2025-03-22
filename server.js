@@ -70,10 +70,11 @@ async function main() {
 
     // Create and start the Source server
     const source = new Source(PORT, logger);
-    if (!source.start()) {
+    try {
+      source.start();
+    } catch (error) {
       logger.error("Failed to start source server");
       process.exit(1);
-      return;
     }
 
     // Start audio session and stream periodically
