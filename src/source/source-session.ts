@@ -82,8 +82,8 @@ export class SourceSession {
     return buffer;
   }
 
+  // Broadcast a binary message to all clients
   sendBinary(buffer: ArrayBuffer) {
-    // Broadcast the binary message to all clients
     for (const client of this.clients.values()) {
       if (!client.isReady) {
         this.logger.log(`Client ${client.clientId} not ready, skipping`);
