@@ -1,20 +1,19 @@
 import {
   SourceInfo,
   SessionInfo,
-  BinaryMessageType,
-  SessionEndMessage,
   ServerMessages,
   ClientMessages,
 } from "../messages.js";
 import { Logger } from "../logging.js";
-import { WebSocketServer, WebSocket, Data } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { IncomingMessage } from "http";
 import { SourceClient } from "./source-client.js";
+import { SourceSession } from "./source-session.js";
 
 export class Source {
   private server: WebSocketServer | null = null;
   private clients: Map<string, SourceClient> = new Map();
-  private sessionInfo: SessionInfo | null = null;
+  private session: SourceSession | null = null;
   private sourceInfo: SourceInfo;
 
   constructor(public port: number, private logger: Logger = console) {
@@ -69,7 +68,6 @@ export class Source {
     this.logger.log(`Removed client: ${clientId}`);
   }
 
-  // Get source info for PlayerClient
   getSourceInfo(): SourceInfo {
     return this.sourceInfo;
   }
@@ -80,33 +78,23 @@ export class Source {
     // Handle special messages if needed
   }
 
-  // Broadcast a message to all connected clients
-  private broadcastMessage(message: ServerMessages) {
-    this.logger.log("Broadcasting:", message);
-    for (const client of this.clients.values()) {
-      client.send(message);
-    }
-  }
-
   // Start an audio session
   startSession(
     codec: string = "pcm",
     sampleRate: number = 44100,
     channels: number = 2,
     bitDepth: number = 16,
-  ) {
+  ): SourceSession {
     if (!this.server) {
-      this.logger.error("WebSocket server not started");
-      return false;
+      throw new Error("WebSocket server not started");
     }
 
-    if (this.sessionInfo) {
-      this.logger.error("Session already active");
-      return false;
+    if (this.session) {
+      throw new Error("Session already active");
     }
 
     // Create session info
-    this.sessionInfo = {
+    const sessionInfo: SessionInfo = {
       session_id: this.generateUniqueId(),
       now: Date.now(), // Current timestamp in milliseconds
       codec,
@@ -116,145 +104,24 @@ export class Source {
       codec_header: null,
     };
 
-    // Send session start message to all players
-    const sessionStartMessage = {
-      type: "session/start" as const,
-      payload: this.sessionInfo,
-    };
-
-    this.broadcastMessage(sessionStartMessage);
-  }
-
-  // End the audio session
-  endSession() {
-    if (!this.server) {
-      this.logger.error("WebSocket server not started");
-      return;
-    }
-
-    if (!this.sessionInfo) {
-      this.logger.error("No session active");
-    }
-
-    // Send session end message
-    const sessionEndMessage: SessionEndMessage = {
-      type: "session/end",
-      payload: {
-        sessionId: this.sessionInfo!.session_id,
+    // Create new session
+    this.session = new SourceSession(
+      sessionInfo,
+      this.clients,
+      this.logger,
+      () => {
+        // This callback is called when the session ends itself
+        this.session = null;
       },
-    };
-
-    this.broadcastMessage(sessionEndMessage);
-
-    this.sessionInfo = null;
-  }
-
-  // Send audio data to all players
-  sendAudio(audioData: Float32Array[], timestamp: number) {
-    if (!this.server) {
-      this.logger.error("WebSocket server not started");
-      return;
-    }
-
-    if (!this.sessionInfo) {
-      this.logger.error("No active session");
-      return;
-    }
-
-    const {
-      channels,
-      sample_rate: sampleRate,
-      bit_depth: bitDepth,
-      codec,
-    } = this.sessionInfo;
-
-    // Validate input
-    if (audioData.length !== channels) {
-      this.logger.error(
-        `Channel mismatch: expected ${channels}, got ${audioData.length}`,
-      );
-      return;
-    }
-
-    // Get sample count from first channel's length
-    const sampleCount = audioData[0].length;
-
-    // Calculate header size and total message size
-    const headerSize = 13;
-    const bytesPerSample = bitDepth / 8;
-    const dataSize = sampleCount * channels * bytesPerSample;
-    const totalSize = headerSize + dataSize;
-
-    // Create the binary message buffer
-    const buffer = new ArrayBuffer(totalSize);
-    const dataView = new DataView(buffer);
-
-    // Write header
-    dataView.setUint8(0, BinaryMessageType.PlayAudioChunk); // Message type
-    dataView.setBigUint64(1, BigInt(timestamp), false);
-    dataView.setUint32(9, sampleCount, false); // Sample count (big-endian)
-
-    // Write audio data
-    for (let i = 0; i < sampleCount; i++) {
-      for (let channel = 0; channel < channels; channel++) {
-        // Convert float [-1,1] to int16 [-32768,32767]
-        const sample = Math.max(-1, Math.min(1, audioData[channel][i]));
-        const sampleInt = Math.round(sample * 32767);
-
-        // Write the sample to the buffer (little-endian)
-        const offset = headerSize + (i * channels + channel) * bytesPerSample;
-        dataView.setInt16(offset, sampleInt, true);
-      }
-    }
-
-    // Broadcast the binary message to all clients
-    for (const client of this.clients.values()) {
-      client.sendBinary(buffer);
-    }
-    this.logger.log(
-      `Broadcasted audio chunk: ${sampleCount} samples at timestamp ${timestamp}ms to ${this.clients.size} clients`,
     );
-  }
 
-  // Create and send a PCM audio chunk from raw samples
-  sendPCMAudioChunk(
-    pcmData: Int16Array | Float32Array,
-    timestamp: number = Date.now(),
-  ) {
-    if (!this.sessionInfo) {
-      this.logger.error("No active session");
-      return;
-    }
-
-    // Convert to Float32Array format if it's Int16Array
-    let floatData: Float32Array[];
-
-    if (pcmData instanceof Int16Array) {
-      // Convert interleaved Int16Array to multichannel Float32Arrays
-      const { channels } = this.sessionInfo;
-      const samplesPerChannel = Math.floor(pcmData.length / channels);
-
-      floatData = Array(channels)
-        .fill(null)
-        .map(() => new Float32Array(samplesPerChannel));
-
-      for (let i = 0; i < samplesPerChannel; i++) {
-        for (let ch = 0; ch < channels; ch++) {
-          floatData[ch][i] = pcmData[i * channels + ch] / 32768;
-        }
-      }
-    } else {
-      // Assume mono if Float32Array is provided directly
-      floatData = [pcmData];
-    }
-
-    this.sendAudio(floatData, timestamp);
+    return this.session;
   }
 
   // Stop the WebSocket server
   stop() {
-    if (this.sessionInfo) {
-      this.endSession();
+    if (this.session) {
+      this.session.end();
     }
 
     if (this.server) {

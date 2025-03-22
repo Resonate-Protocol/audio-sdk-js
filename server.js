@@ -1,4 +1,4 @@
-import { Source } from "./dist/source.js";
+import { Source } from "./dist/source/source.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -81,13 +81,13 @@ async function main() {
       const playAudio = () => {
         logger.log("");
         logger.log("Sending WAV audio data to connected clients");
-        source.startSession(
+        const session = source.startSession(
           "pcm",
           wavData.sampleRate,
           wavData.channels,
           wavData.bitDepth,
         );
-        source.sendPCMAudioChunk(
+        session.sendPCMAudioChunk(
           wavData.audioData,
           // play in 500ms
           Date.now() + 500,
@@ -98,8 +98,8 @@ async function main() {
         //   Date.now() + 5500,
         // );
         // end session after audio is done playing.
-        setTimeout(() => source.endSession(), 5500);
-        // setTimeout(() => source.endSession(), 10500);
+        setTimeout(() => session.end(), 5500);
+        // setTimeout(() => source.end(), 10500);
       };
 
       // Play immediately once
