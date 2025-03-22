@@ -39,16 +39,6 @@ export class Source {
     });
   }
 
-  // Register a player after it sends a hello message
-  registerPlayer(playerClient: SourceClient) {
-    this.clients.registerPlayer(playerClient);
-  }
-
-  // Remove a player when they disconnect
-  removePlayer(clientId: string) {
-    this.clients.removePlayer(clientId);
-  }
-
   getSourceInfo(): SourceInfo {
     return this.sourceInfo;
   }

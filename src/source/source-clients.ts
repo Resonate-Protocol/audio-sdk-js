@@ -1,7 +1,7 @@
 import { WebSocket } from "ws";
 import { IncomingMessage } from "http";
 import { Logger } from "../logging.js";
-import { ClientMessages } from "../messages.js";
+import { ClientMessages, SourceInfo } from "../messages.js";
 import { SourceClient } from "./source-client.js";
 import { Source } from "./source.js";
 
@@ -18,22 +18,9 @@ export class SourceClients {
   // Handle new client connections
   handleConnection(ws: WebSocket, request: IncomingMessage) {
     const clientId = this.generateUniqueId();
-    const playerClient = new SourceClient(
-      clientId,
-      ws,
-      this.source,
-      this.logger,
-    );
+    const playerClient = new SourceClient(clientId, ws, this, this.logger);
     this.clients.set(clientId, playerClient);
     this.logger.log(`Client connected: ${clientId}`);
-  }
-
-  // Register a player after it sends a hello message
-  registerPlayer(playerClient: SourceClient) {
-    const playerId = playerClient.getPlayerId();
-    if (playerId) {
-      this.logger.log(`Registered player: ${playerId}`);
-    }
   }
 
   // Remove a player when they disconnect
@@ -50,5 +37,15 @@ export class SourceClients {
   // Get number of connected clients
   count(): number {
     return this.clients.size;
+  }
+
+  // Get source info from Source
+  getSourceInfo(): SourceInfo {
+    return this.source.getSourceInfo();
+  }
+
+  // Handle unknown messages by forwarding to Source
+  handleUnknownPlayerMessage(clientId: string, message: ClientMessages) {
+    this.source.handleUnknownPlayerMessage(clientId, message);
   }
 }

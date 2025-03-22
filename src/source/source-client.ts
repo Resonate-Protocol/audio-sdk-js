@@ -1,7 +1,7 @@
 import { WebSocket } from "ws";
 import { PlayerInfo, ServerMessages, ClientMessages } from "../messages.js";
 import { Logger } from "../logging.js";
-import { Source } from "./source.js";
+import { SourceClients } from "./source-clients.js";
 
 export class SourceClient {
   public playerInfo: PlayerInfo | null = null;
@@ -9,7 +9,7 @@ export class SourceClient {
   constructor(
     public readonly clientId: string,
     public readonly socket: WebSocket,
-    private readonly source: Source,
+    private readonly sourceClients: SourceClients,
     private readonly logger: Logger,
   ) {
     this.socket.on("message", this.handleMessage.bind(this));
@@ -44,26 +44,21 @@ export class SourceClient {
           `Unhandled message type from ${this.clientId}:`,
           message.type,
         );
-        // Forward to source for handling
-        this.source.handleUnknownPlayerMessage(this.clientId, message);
+        // Forward to sourceClients for handling
+        this.sourceClients.handleUnknownPlayerMessage(this.clientId, message);
     }
   }
 
   private handlePlayerHello(playerInfo: PlayerInfo) {
     this.playerInfo = playerInfo;
     this.logger.log("Player connected:", playerInfo);
-
-    // Register with source
-    this.source.registerPlayer(this);
-
-    // Send source hello back to the player
     this.sendSourceHello();
   }
 
   sendSourceHello() {
     const sourceHelloMessage = {
       type: "source/hello" as const,
-      payload: this.source.getSourceInfo(),
+      payload: this.sourceClients.getSourceInfo(),
     };
 
     this.send(sourceHelloMessage);
@@ -86,7 +81,7 @@ export class SourceClient {
 
   private handleClose() {
     this.logger.log(`Player ${this.clientId} disconnected`);
-    this.source.removePlayer(this.clientId);
+    this.sourceClients.removePlayer(this.clientId);
   }
 
   private handleError(error: Error) {
