@@ -1,18 +1,13 @@
-import {
-  SourceInfo,
-  SessionInfo,
-  ServerMessages,
-  ClientMessages,
-} from "../messages.js";
+import { SourceInfo, SessionInfo, ClientMessages } from "../messages.js";
 import { Logger } from "../logging.js";
-import { WebSocketServer, WebSocket } from "ws";
-import { IncomingMessage } from "http";
+import { WebSocketServer } from "ws";
 import { SourceClient } from "./source-client.js";
 import { SourceSession } from "./source-session.js";
+import { SourceClients } from "./source-clients.js";
 
 export class Source {
   private server: WebSocketServer | null = null;
-  private clients: Map<string, SourceClient> = new Map();
+  private clients: SourceClients;
   private session: SourceSession | null = null;
   private sourceInfo: SourceInfo;
 
@@ -22,6 +17,9 @@ export class Source {
       sourceId: this.generateUniqueId(),
       name: "AudioSource",
     };
+
+    // Initialize players manager
+    this.clients = new SourceClients(this, logger);
   }
 
   private generateUniqueId(): string {
@@ -34,7 +32,9 @@ export class Source {
       this.server = new WebSocketServer({ port: this.port });
       this.logger.log(`WebSocket server started on port ${this.port}`);
 
-      this.server.on("connection", this.handleConnection.bind(this));
+      this.server.on("connection", (ws, request) =>
+        this.clients.handleConnection(ws, request),
+      );
       this.server.on("error", (error) => {
         this.logger.error("WebSocket server error:", error);
       });
@@ -46,26 +46,14 @@ export class Source {
     }
   }
 
-  // Handle new client connections
-  private handleConnection(ws: WebSocket, request: IncomingMessage) {
-    const clientId = this.generateUniqueId();
-    const playerClient = new SourceClient(clientId, ws, this, this.logger);
-    this.clients.set(clientId, playerClient);
-    this.logger.log(`Client connected: ${clientId}`);
-  }
-
   // Register a player after it sends a hello message
   registerPlayer(playerClient: SourceClient) {
-    const playerId = playerClient.getPlayerId();
-    if (playerId) {
-      this.logger.log(`Registered player: ${playerId}`);
-    }
+    this.clients.registerPlayer(playerClient);
   }
 
   // Remove a player when they disconnect
   removePlayer(clientId: string) {
-    this.clients.delete(clientId);
-    this.logger.log(`Removed client: ${clientId}`);
+    this.clients.removePlayer(clientId);
   }
 
   getSourceInfo(): SourceInfo {
@@ -104,10 +92,10 @@ export class Source {
       codec_header: null,
     };
 
-    // Create new session
+    // Create new session with current clients from sourcePlayers
     this.session = new SourceSession(
       sessionInfo,
-      new Map(this.clients),
+      this.clients.getClients(),
       this.logger,
       () => {
         // This callback is called when the session ends itself
@@ -130,7 +118,5 @@ export class Source {
       });
       this.server = null;
     }
-
-    this.clients.clear();
   }
 }
