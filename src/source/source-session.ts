@@ -28,7 +28,10 @@ export class SourceSession {
     };
 
     for (const clientId of this.sessionActive) {
-      this.clients.get(clientId)?.send(sessionEndMessage);
+      const client = this.clients.get(clientId);
+      if (client && client.isReady()) {
+        client.send(sessionEndMessage);
+      }
     }
     this.sessionActive.clear();
     this.onSessionEnd();
