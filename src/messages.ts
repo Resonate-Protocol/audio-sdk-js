@@ -28,7 +28,7 @@ export interface PlayerHelloMessage {
 }
 
 export interface SourceInfo {
-  sourceId: string;
+  source_id: string;
   name: string;
 }
 

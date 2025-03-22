@@ -1,105 +1,44 @@
-import { SourceInfo, SessionInfo, ClientMessages } from "../messages.js";
+import { WebSocket } from "ws";
+import { IncomingMessage } from "http";
 import { Logger } from "../logging.js";
-import { WebSocketServer } from "ws";
+import { SourceInfo } from "../messages.js";
 import { SourceClient } from "./source-client.js";
-import { SourceSession } from "./source-session.js";
-import { SourceClients } from "./source-clients.js";
 
 export class Source {
-  private server: WebSocketServer | null = null;
-  private clients: SourceClients;
-  private session: SourceSession | null = null;
-  private sourceInfo: SourceInfo;
+  private clients: Map<string, SourceClient> = new Map();
 
-  constructor(public port: number, private logger: Logger = console) {
-    // Initialize source info with default values
-    this.sourceInfo = {
-      sourceId: this.generateUniqueId(),
-      name: "AudioSource",
-    };
+  constructor(private sourceInfo: SourceInfo, private logger: Logger) {}
 
-    // Initialize players manager
-    this.clients = new SourceClients(this, logger);
-  }
-
+  // Generate a unique ID for clients
   private generateUniqueId(): string {
-    return `source_${Math.random().toString(36).substring(2, 9)}`;
+    return `client_${Math.random().toString(36).substring(2, 9)}`;
   }
 
-  // Start the WebSocket server
-  start() {
-    this.server = new WebSocketServer({ port: this.port });
-    this.logger.log(`WebSocket server started on port ${this.port}`);
+  // Handle new client connections
+  handleConnection(ws: WebSocket, request: IncomingMessage) {
+    const clientId = this.generateUniqueId();
+    const playerClient = new SourceClient(clientId, ws, this, this.logger);
+    this.clients.set(clientId, playerClient);
+    this.logger.log(`Client connected: ${clientId}`);
+  }
 
-    this.server.on("connection", (ws, request) =>
-      this.clients.handleConnection(ws, request),
-    );
-    this.server.on("error", (error) => {
-      this.logger.error("WebSocket server error:", error);
-    });
+  // Remove a player when they disconnect
+  removePlayer(clientId: string) {
+    this.clients.delete(clientId);
+    this.logger.log(`Removed client: ${clientId}`);
+  }
+
+  // Get a copy of the current clients map
+  getClients(): Map<string, SourceClient> {
+    return new Map(this.clients);
+  }
+
+  // Get number of connected clients
+  count(): number {
+    return this.clients.size;
   }
 
   getSourceInfo(): SourceInfo {
     return this.sourceInfo;
-  }
-
-  // Handle messages that PlayerClient doesn't handle
-  handleUnknownPlayerMessage(clientId: string, message: ClientMessages) {
-    this.logger.log(`Handling unknown message from ${clientId}:`, message);
-    // Handle special messages if needed
-  }
-
-  // Start an audio session
-  startSession(
-    codec: string = "pcm",
-    sampleRate: number = 44100,
-    channels: number = 2,
-    bitDepth: number = 16,
-  ): SourceSession {
-    if (!this.server) {
-      throw new Error("WebSocket server not started");
-    }
-
-    if (this.session) {
-      throw new Error("Session already active");
-    }
-
-    // Create session info
-    const sessionInfo: SessionInfo = {
-      session_id: this.generateUniqueId(),
-      now: Date.now(), // Current timestamp in milliseconds
-      codec,
-      sample_rate: sampleRate,
-      channels,
-      bit_depth: bitDepth,
-      codec_header: null,
-    };
-
-    // Create new session with current clients from sourcePlayers
-    this.session = new SourceSession(
-      sessionInfo,
-      this.clients.getClients(),
-      this.logger,
-      () => {
-        // This callback is called when the session ends itself
-        this.session = null;
-      },
-    );
-
-    return this.session;
-  }
-
-  // Stop the WebSocket server
-  stop() {
-    if (this.session) {
-      this.session.end();
-    }
-
-    if (this.server) {
-      this.server.close(() => {
-        this.logger.log("WebSocket server closed");
-      });
-      this.server = null;
-    }
   }
 }

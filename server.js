@@ -1,4 +1,4 @@
-import { Source } from "./dist/source/source.js";
+import { SourceServer } from "./dist/source/source-server.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -69,11 +69,11 @@ async function main() {
     const wavData = parseWavFile(WAV_FILE);
 
     // Create and start the Source server
-    const source = new Source(PORT, logger);
+    const server = new SourceServer("SDKSample", PORT, logger);
     try {
-      source.start();
+      server.start();
     } catch (error) {
-      logger.error("Failed to start source server");
+      logger.error("Failed to start source server", error);
       process.exit(1);
     }
 
@@ -82,7 +82,7 @@ async function main() {
       const playAudio = () => {
         logger.log("");
         logger.log("Sending WAV audio data to connected clients");
-        const session = source.startSession(
+        const session = server.startSession(
           "pcm",
           wavData.sampleRate,
           wavData.channels,
@@ -113,7 +113,7 @@ async function main() {
     // Handle process termination
     process.on("SIGINT", () => {
       logger.log("Shutting down server...");
-      source.stop();
+      server.stop();
       process.exit(0);
     });
   } catch (error) {

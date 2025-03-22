@@ -1,7 +1,7 @@
 import { WebSocket } from "ws";
 import { PlayerInfo, ServerMessages, ClientMessages } from "../messages.js";
 import { Logger } from "../logging.js";
-import { SourceClients } from "./source-clients.js";
+import { Source } from "./source.js";
 
 export class SourceClient {
   public playerInfo: PlayerInfo | null = null;
@@ -9,7 +9,7 @@ export class SourceClient {
   constructor(
     public readonly clientId: string,
     public readonly socket: WebSocket,
-    private readonly sourceClients: SourceClients,
+    private readonly sourceClients: Source,
     private readonly logger: Logger,
   ) {
     this.socket.on("message", this.handleMessage.bind(this));
@@ -44,8 +44,6 @@ export class SourceClient {
           `Unhandled message type from ${this.clientId}:`,
           message.type,
         );
-        // Forward to sourceClients for handling
-        this.sourceClients.handleUnknownPlayerMessage(this.clientId, message);
     }
   }
 
