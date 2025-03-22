@@ -48,7 +48,7 @@ export class SourceSession {
   }
 
   // Send audio data to all players
-  sendAudio(audioData: Float32Array[], timestamp: number) {
+  sendAudio(audioData: Float32Array[], timestamp: number): void {
     const {
       channels,
       sample_rate: sampleRate,
@@ -58,10 +58,9 @@ export class SourceSession {
 
     // Validate input
     if (audioData.length !== channels) {
-      this.logger.error(
+      throw new Error(
         `Channel mismatch: expected ${channels}, got ${audioData.length}`,
       );
-      return;
     }
 
     // Get sample count from first channel's length

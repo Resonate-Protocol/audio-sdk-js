@@ -67,18 +67,18 @@ export class SourceClient {
   }
 
   send(message: ServerMessages) {
-    if (this.socket.readyState === WebSocket.OPEN) {
-      const messageString =
-        typeof message === "string" ? message : JSON.stringify(message);
-      this.socket.send(messageString);
-      this.logger.log(`Sent to ${this.clientId}:`, message);
+    if (this.socket.readyState !== WebSocket.OPEN) {
+      throw new Error("Client not connected");
     }
+    this.socket.send(JSON.stringify(message));
+    this.logger.log(`Sent to ${this.clientId}:`, message);
   }
 
   sendBinary(data: ArrayBuffer) {
-    if (this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(data);
+    if (this.socket.readyState !== WebSocket.OPEN) {
+      throw new Error("Client not connected");
     }
+    this.socket.send(data);
   }
 
   private handleClose() {
