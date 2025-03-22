@@ -6,6 +6,8 @@ import {
 import type { Logger } from "../logging.js";
 import { SourceClient } from "./source-client.js";
 
+const HEADER_SIZE = 13;
+
 export class SourceSession {
   sessionActive: Set<string> = new Set();
 
@@ -32,54 +34,14 @@ export class SourceSession {
     this.onSessionEnd();
   }
 
-  // Send audio data to all players
-  createAudioPacket(audioData: Float32Array[], timestamp: number): ArrayBuffer {
-    const {
-      channels,
-      sample_rate: sampleRate,
-      bit_depth: bitDepth,
-      codec,
-    } = this.sessionInfo;
-
-    // Validate input
-    if (audioData.length !== channels) {
-      throw new Error(
-        `Channel mismatch: expected ${channels}, got ${audioData.length}`,
-      );
-    }
-
-    // Get sample count from first channel's length
-    const sampleCount = audioData[0].length;
-
-    // Calculate header size and total message size
-    const headerSize = 13;
-    const bytesPerSample = bitDepth / 8;
-    const dataSize = sampleCount * channels * bytesPerSample;
-    const totalSize = headerSize + dataSize;
-
-    // Create the binary message buffer
-    const buffer = new ArrayBuffer(totalSize);
-    const dataView = new DataView(buffer);
-
-    // Write header
-    dataView.setUint8(0, BinaryMessageType.PlayAudioChunk); // Message type
-    dataView.setBigUint64(1, BigInt(timestamp), false);
-    dataView.setUint32(9, sampleCount, false); // Sample count (big-endian)
-
-    // Write audio data
-    for (let i = 0; i < sampleCount; i++) {
-      for (let channel = 0; channel < channels; channel++) {
-        // Convert float [-1,1] to int16 [-32768,32767]
-        const sample = Math.max(-1, Math.min(1, audioData[channel][i]));
-        const sampleInt = Math.round(sample * 32767);
-
-        // Write the sample to the buffer (little-endian)
-        const offset = headerSize + (i * channels + channel) * bytesPerSample;
-        dataView.setInt16(offset, sampleInt, true);
-      }
-    }
-
-    return buffer;
+  writeAudioPacketHeader(
+    data: DataView,
+    timestamp: number,
+    sampleCount: number,
+  ) {
+    data.setUint8(0, BinaryMessageType.PlayAudioChunk); // Message type
+    data.setBigUint64(1, BigInt(timestamp), false);
+    data.setUint32(9, sampleCount, false); // Sample count (big-endian)
   }
 
   // Broadcast a binary message to all clients
@@ -130,7 +92,43 @@ export class SourceSession {
       floatData = [pcmData];
     }
 
-    this.sendBinary(this.createAudioPacket(floatData, timestamp));
+    const { channels, bit_depth: bitDepth } = this.sessionInfo;
+
+    // Validate input
+    if (floatData.length !== channels) {
+      throw new Error(
+        `Channel mismatch: expected ${channels}, got ${floatData.length}`,
+      );
+    }
+
+    // Get sample count from first channel's length
+    const sampleCount = floatData[0].length;
+
+    // Calculate header size and total message size
+    const bytesPerSample = bitDepth / 8;
+    const dataSize = sampleCount * channels * bytesPerSample;
+    const totalSize = HEADER_SIZE + dataSize;
+
+    // Create the binary message buffer
+    const buffer = new ArrayBuffer(totalSize);
+    const dataView = new DataView(buffer);
+
+    this.writeAudioPacketHeader(dataView, timestamp, sampleCount);
+
+    // Write audio data
+    for (let i = 0; i < sampleCount; i++) {
+      for (let channel = 0; channel < channels; channel++) {
+        // Convert float [-1,1] to int16 [-32768,32767]
+        const sample = Math.max(-1, Math.min(1, floatData[channel][i]));
+        const sampleInt = Math.round(sample * 32767);
+
+        // Write the sample to the buffer (little-endian)
+        const offset = HEADER_SIZE + (i * channels + channel) * bytesPerSample;
+        dataView.setInt16(offset, sampleInt, true);
+      }
+    }
+
+    this.sendBinary(buffer);
     this.logger.log(
       `Broadcasted audio chunk: ${floatData[0].length} samples at timestamp ${timestamp}ms to ${this.clients.size} clients`,
     );
