@@ -87,6 +87,9 @@ export class SourceSession {
     for (const client of this.clients.values()) {
       if (!client.isReady) {
         this.logger.log(`Client ${client.clientId} not ready, skipping`);
+        if (this.sessionActive.has(client.clientId)) {
+          this.sessionActive.delete(client.clientId);
+        }
         continue;
       }
       if (!this.sessionActive.has(client.clientId)) {
