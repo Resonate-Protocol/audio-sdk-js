@@ -88,19 +88,17 @@ async function main() {
           wavData.channels,
           wavData.bitDepth,
         );
-        session.sendPCMAudioChunk(
-          wavData.audioData,
-          // play in 500ms
-          Date.now() + 500,
-        );
-        // source.sendPCMAudioChunk(
-        //   wavData.audioData,
-        //   // play in 5500ms
-        //   Date.now() + 5500,
-        // );
+        let start = Date.now() + 500;
+
+        for (let i = 0; i < wavData.audioData.length; i += 22050) {
+          session.sendPCMAudioChunk(
+            wavData.audioData.slice(i, i + 22050),
+            start,
+          );
+          start += 250;
+        }
         // end session after audio is done playing.
-        setTimeout(() => session.end(), 6500);
-        // setTimeout(() => source.end(), 10500);
+        setTimeout(() => session.end(), start - Date.now());
       };
 
       // Play immediately once
