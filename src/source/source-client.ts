@@ -27,7 +27,8 @@ export class SourceClient {
         );
         this.processMessage(parsedMessage);
       } catch (err) {
-        this.logger.error(`Error parsing message from ${this.clientId}:`, err);
+        this.logger.error(`Error handling message from ${this.clientId}:`, err);
+        this.socket.close(1, "error handling message");
       }
     }
   }
@@ -35,9 +36,9 @@ export class SourceClient {
   private processMessage(message: ClientMessages) {
     switch (message.type) {
       case "player/hello":
-        this.handlePlayerHello(message.payload as PlayerInfo);
+        this.handlePlayerHello(message.payload);
         break;
-      // Add other message types as needed
+
       default:
         this.logger.log(
           `Unhandled message type from ${this.clientId}:`,
@@ -61,14 +62,14 @@ export class SourceClient {
 
   sendSourceHello() {
     const sourceHelloMessage = {
-      type: "source/hello",
+      type: "source/hello" as const,
       payload: this.source.getSourceInfo(),
     };
 
     this.send(sourceHelloMessage);
   }
 
-  send(message: ServerMessages | any) {
+  send(message: ServerMessages) {
     if (this.socket.readyState === WebSocket.OPEN) {
       const messageString =
         typeof message === "string" ? message : JSON.stringify(message);

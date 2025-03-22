@@ -107,7 +107,7 @@ export class Source {
     // Create new session
     this.session = new SourceSession(
       sessionInfo,
-      this.clients,
+      new Map(this.clients),
       this.logger,
       () => {
         // This callback is called when the session ends itself
