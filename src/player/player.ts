@@ -15,7 +15,15 @@ type Events = {
   "session-update": SessionInfo | null;
 };
 
+export interface PlayerOptions {
+  playerId: string;
+  url: string;
+  logger?: Logger;
+}
+
 export class Player extends EventEmitter<Events> {
+  private options: PlayerOptions;
+  private logger: Logger = console;
   private ws: WebSocket | null = null;
   private sourceInfo: SourceInfo | null = null;
   private sessionInfo: SessionInfo | null = null;
@@ -23,18 +31,18 @@ export class Player extends EventEmitter<Events> {
   private serverTimeDiff: number = 0; // Time difference between server and client
   private expectClose = true;
 
-  constructor(
-    public playerId: string,
-    public url: string,
-    private logger: Logger = console,
-  ) {
+  constructor(options: PlayerOptions) {
     super();
+    this.options = options;
+    if (options.logger) {
+      this.logger = options.logger;
+    }
   }
 
   // Establish a WebSocket connection
   connect(isReconnect: boolean = false) {
     this.expectClose = !isReconnect;
-    this.ws = new WebSocket(this.url);
+    this.ws = new WebSocket(this.options.url);
     // Expect binary data as ArrayBuffer
     this.ws.binaryType = "arraybuffer";
 
@@ -76,7 +84,7 @@ export class Player extends EventEmitter<Events> {
     const helloMsg: PlayerHelloMessage = {
       type: "player/hello",
       payload: {
-        player_id: this.playerId,
+        player_id: this.options.playerId,
         name: "PlayerClient",
         role: "player",
         support_codecs: ["pcm"],

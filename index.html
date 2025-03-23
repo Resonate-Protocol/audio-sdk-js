@@ -233,7 +233,11 @@
 
         try {
           // Create and connect the player with our custom logger
-          player = new Player(playerIdInput.value, url, logger);
+          player = new Player({
+            playerId: playerIdInput.value,
+            url,
+            logger,
+          });
           player.on("close", (ev) => {
             if (!ev.expected) {
               logger.error("Connection closed unexpectedly");
