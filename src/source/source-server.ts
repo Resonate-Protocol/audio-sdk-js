@@ -29,20 +29,6 @@ export class SourceServer {
     this.source.addClient(playerClient);
   }
 
-  // Start an audio session - delegates to Source
-  startSession(
-    codec: string = "pcm",
-    sampleRate: number = 44100,
-    channels: number = 2,
-    bitDepth: number = 16,
-  ): SourceSession {
-    if (!this.server) {
-      throw new Error("WebSocket server not started");
-    }
-
-    return this.source.startSession(codec, sampleRate, channels, bitDepth);
-  }
-
   // Stop the WebSocket server
   stop() {
     const session = this.source.getSession();

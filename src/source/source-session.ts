@@ -29,7 +29,6 @@ export class SourceSession {
 
     for (const clientId of this.sessionActive) {
       const client = this.clients.get(clientId);
-      console.log({ client, isReady: client?.isReady() });
       if (client && client.isReady()) {
         client.send(sessionEndMessage);
       }

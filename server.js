@@ -94,7 +94,7 @@ async function main() {
     const playAudio = async () => {
       logger.log("");
       logger.log("Sending WAV audio data to connected clients");
-      const session = server.startSession(
+      const session = source.startSession(
         "pcm",
         wavData.sampleRate,
         wavData.channels,
