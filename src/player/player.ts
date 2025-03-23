@@ -8,7 +8,14 @@ import {
 import type { Logger } from "../logging.js";
 import { EventEmitter } from "../util/event-emitter.js";
 
-export class Player extends EventEmitter {
+type Events = {
+  open: void;
+  close: { expected: boolean };
+  "source-update": SourceInfo | null;
+  "session-update": SessionInfo | null;
+};
+
+export class Player extends EventEmitter<Events> {
   private ws: WebSocket | null = null;
   private sourceInfo: SourceInfo | null = null;
   private sessionInfo: SessionInfo | null = null;

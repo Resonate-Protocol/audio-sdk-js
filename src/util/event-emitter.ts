@@ -1,16 +1,29 @@
-export class EventEmitter {
-  _listeners: { [key: string]: Function[] } = {};
+export class EventEmitter<E extends Record<string, any>> {
+  private _listeners: {
+    [K in keyof E]?: Array<(data: E[K]) => unknown>;
+  } = {};
 
-  on(event: string, listener: Function) {
+  on<K extends keyof E>(event: K, listener: (data: E[K]) => unknown): this {
     if (!this._listeners[event]) {
       this._listeners[event] = [];
     }
-    this._listeners[event].push(listener);
+    this._listeners[event]!.push(listener);
+    return this;
   }
 
-  fire(event: string, ...args: any[]) {
+  off<K extends keyof E>(event: K, listener: (data: E[K]) => unknown): this {
     if (this._listeners[event]) {
-      this._listeners[event].forEach((listener) => listener(...args));
+      this._listeners[event] = this._listeners[event]!.filter(
+        (l) => l !== listener,
+      );
+    }
+    return this;
+  }
+
+  fire<K extends keyof E>(event: K, data?: E[K]): void {
+    if (this._listeners[event]) {
+      const listeners = this._listeners[event]!;
+      listeners.forEach((listener) => listener(data as E[K]));
     }
   }
 }
