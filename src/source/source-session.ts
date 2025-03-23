@@ -43,7 +43,7 @@ export class SourceSession {
     sampleCount: number,
   ) {
     data.setUint8(0, BinaryMessageType.PlayAudioChunk); // Message type
-    data.setBigUint64(1, BigInt(timestamp), false);
+    data.setBigInt64(1, BigInt(timestamp), false);
     data.setUint32(9, sampleCount, false); // Sample count (big-endian)
   }
 

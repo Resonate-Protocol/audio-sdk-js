@@ -50,7 +50,8 @@ export class Source {
     // Create session info
     const sessionInfo: SessionInfo = {
       session_id: generateUniqueId("session"),
-      now: Date.now(), // Current timestamp in milliseconds
+      // Current timestamp in microseconds
+      now: Math.round((performance.timeOrigin + performance.now()) * 1000),
       codec,
       sample_rate: sampleRate,
       channels,

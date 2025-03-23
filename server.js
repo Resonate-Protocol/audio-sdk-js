@@ -100,15 +100,20 @@ async function main() {
         wavData.channels,
         wavData.bitDepth,
       );
-      let start = Date.now() + 500;
+      let start = performance.timeOrigin + performance.now() + 500;
       const timeSlice = 250; // ms
       const bytesPerSlice =
         (timeSlice / 1000) * wavData.sampleRate * wavData.channels;
 
       for (let i = 0; i < wavData.audioData.length; i += bytesPerSlice) {
         const chunk = wavData.audioData.slice(i, i + bytesPerSlice);
-        session.sendPCMAudioChunk(chunk, start);
-        const sleepDuration = start - Date.now();
+        session.sendPCMAudioChunk(
+          chunk,
+          // We send microsecond timestamp as integer
+          Math.round(start * 1000),
+        );
+        const sleepDuration =
+          start - performance.timeOrigin - performance.now();
         // Usually equal to timeSlice, but shorter for last chunk
         start += (chunk.length / bytesPerSlice) * timeSlice;
         await sleep(sleepDuration);

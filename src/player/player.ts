@@ -122,7 +122,7 @@ export class Player extends EventEmitter<Events> {
 
         // Convert server time to seconds for consistent unit with audioContext.currentTime
         this.serverTimeDiff =
-          this.sessionInfo.now / 1000 - this.audioContext.currentTime;
+          this.sessionInfo.now / 1000000 - this.audioContext.currentTime;
         this.logger.log(`Server time difference: ${this.serverTimeDiff}s`);
         break;
 
@@ -178,10 +178,10 @@ export class Player extends EventEmitter<Events> {
     // Create a DataView for accessing binary data
     const dataView = new DataView(data);
 
-    // Bytes 2-5: timestamp (big-endian unsigned integer)
-    const startTimeAtServer = Number(dataView.getBigUint64(1, false));
+    // Bytes 2-8: timestamp (big-endian unsigned integer)
+    const startTimeAtServer = Number(dataView.getBigInt64(1, false));
 
-    // Bytes 6-9: sample count (big-endian unsigned integer) - replaces duration in ms
+    // Bytes 9-12: sample count (big-endian unsigned integer) - replaces duration in ms
     const sampleCount = dataView.getUint32(9, false);
 
     // Header size in bytes
@@ -260,9 +260,9 @@ export class Player extends EventEmitter<Events> {
     source.buffer = audioBuffer;
     source.connect(this.audioContext.destination);
 
-    // Convert server timestamp (milliseconds) to AudioContext time (seconds)
+    // Convert server timestamp (microseconds) to AudioContext time (seconds)
     const startTimeInAudioContext =
-      startTimeAtServer / 1000 - this.serverTimeDiff;
+      startTimeAtServer / 1000000 - this.serverTimeDiff;
 
     // Calculate how much time we have before this chunk should play
     const scheduleDelay =
