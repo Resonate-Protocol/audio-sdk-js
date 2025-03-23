@@ -5,7 +5,7 @@ import {
   BinaryMessageType,
   PlayerHelloMessage,
 } from "./messages.js";
-import { Logger } from "./logging.js";
+import type { Logger } from "./logging.js";
 import { EventEmitter } from "./util/event-emitter.js";
 
 export class Player extends EventEmitter {
@@ -247,13 +247,6 @@ export class Player extends EventEmitter {
     // Convert server timestamp (milliseconds) to AudioContext time (seconds)
     const startTimeInAudioContext =
       startTimeAtServer / 1000 - this.serverTimeDiff;
-
-    console.log({
-      startTimeAtServer,
-      serverTimeDiff: this.serverTimeDiff,
-      audioContextTime: this.audioContext.currentTime,
-      startTimeInAudioContext,
-    });
 
     // Calculate how much time we have before this chunk should play
     const scheduleDelay =

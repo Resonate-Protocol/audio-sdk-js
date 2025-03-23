@@ -1,6 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Logger } from "../logging.js";
-import type { SourceSession } from "./source-session.js";
 import { Source } from "./source.js";
 import { SourceClient } from "./source-client.js";
 
