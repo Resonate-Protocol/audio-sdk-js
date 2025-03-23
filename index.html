@@ -228,7 +228,12 @@
         try {
           // Create and connect the player with our custom logger
           player = new Player(playerIdInput.value, url, logger);
-          player.on("close", () => {
+          player.on("close", (ev) => {
+            if (!ev.expected) {
+              logger.error("Connection closed unexpectedly");
+              setTimeout(() => player.connect(), 5000);
+              return;
+            }
             player = null;
             connectButton.textContent = "Connect";
             connectionStatus.textContent = "Disconnected";
