@@ -28,15 +28,15 @@ export class SourceClient {
     this.sendSourceHello();
   }
 
-  private handleMessage(message: any) {
-    if (typeof message !== "string") {
+  private handleMessage(message: any, isBinary: boolean) {
+    if (isBinary) {
       this.logger.error(
         `Client ${this.clientId} received unexpected binary message`,
       );
       return;
     }
     try {
-      const parsedMessage = JSON.parse(message) as ClientMessages;
+      const parsedMessage = JSON.parse(message.toString()) as ClientMessages;
       this.logger.log(`Received message from ${this.clientId}:`, parsedMessage);
       this.processMessage(parsedMessage);
     } catch (err) {
@@ -61,7 +61,7 @@ export class SourceClient {
 
   private handlePlayerHello(playerInfo: PlayerInfo) {
     this.playerInfo = playerInfo;
-    this.logger.log("Player connected:", playerInfo);
+    this.logger.log("Player info received:", playerInfo);
   }
 
   sendSourceHello() {
@@ -109,6 +109,8 @@ export class SourceClient {
   }
 
   isReady(): boolean {
-    return this.socket.readyState === WebSocket.OPEN;
+    return (
+      this.socket.readyState === WebSocket.OPEN && this.playerInfo !== null
+    );
   }
 }
