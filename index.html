@@ -87,7 +87,6 @@
       </div>
     </div>
 
-    <script type="module" src="./dist/player.js"></script>
     <script type="module">
       import { Player } from "./dist/player.js";
 
@@ -214,6 +213,12 @@
         try {
           // Create and connect the player with our custom logger
           player = new Player(url, logger);
+          player.on("close", () => {
+            player = null;
+            connectButton.textContent = "Connect";
+            connectionStatus.textContent = "Disconnected";
+            logger.log("Disconnected from server");
+          });
           player.connect();
 
           // Update UI

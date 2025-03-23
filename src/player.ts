@@ -6,15 +6,18 @@ import {
   PlayerHelloMessage,
 } from "./messages.js";
 import { Logger } from "./logging.js";
+import { EventEmitter } from "./util/event-emitter.js";
 
-export class Player {
+export class Player extends EventEmitter {
   private ws: WebSocket | null = null;
   private sourceInfo: SourceInfo | null = null;
   private sessionInfo: SessionInfo | null = null;
   private audioContext: AudioContext | null = null;
   private serverTimeDiff: number = 0; // Time difference between server and client
 
-  constructor(public url: string, private logger: Logger = console) {}
+  constructor(public url: string, private logger: Logger = console) {
+    super();
+  }
 
   // Establish a WebSocket connection
   connect() {
@@ -25,6 +28,7 @@ export class Player {
     this.ws.onopen = () => {
       this.logger.log("WebSocket connected");
       this.sendHello();
+      this.fire("open");
     };
 
     this.ws.onmessage = (event) => {
@@ -47,6 +51,7 @@ export class Player {
 
     this.ws.onclose = () => {
       this.logger.log("WebSocket connection closed");
+      this.fire("close");
     };
   }
 
@@ -78,11 +83,13 @@ export class Player {
       case "source/hello":
         this.sourceInfo = message.payload;
         this.logger.log("Source connected:", this.sourceInfo);
+        this.fire("source-update", this.sourceInfo);
 
         break;
       case "session/start":
         this.logger.log("Session started", message.payload);
         this.sessionInfo = message.payload;
+        this.fire("session-update", this.sessionInfo);
 
         // Use standard AudioContext or fallback to webkitAudioContext
         const AudioContextClass =
@@ -97,6 +104,7 @@ export class Player {
 
       case "session/end":
         this.logger.log("Session ended");
+        this.fire("session-update", null);
         // Clean up AudioContext when the session ends
         if (this.audioContext && this.audioContext.state !== "closed") {
           this.audioContext.close();
