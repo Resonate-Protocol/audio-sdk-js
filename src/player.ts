@@ -15,7 +15,11 @@ export class Player extends EventEmitter {
   private audioContext: AudioContext | null = null;
   private serverTimeDiff: number = 0; // Time difference between server and client
 
-  constructor(public url: string, private logger: Logger = console) {
+  constructor(
+    public playerId: string,
+    public url: string,
+    private logger: Logger = console,
+  ) {
     super();
   }
 
@@ -60,7 +64,7 @@ export class Player extends EventEmitter {
     const helloMsg: PlayerHelloMessage = {
       type: "player/hello",
       payload: {
-        player_id: "unique_player_id", // replace with a unique id as needed
+        player_id: this.playerId,
         name: "PlayerClient",
         role: "player",
         support_codecs: ["pcm"],

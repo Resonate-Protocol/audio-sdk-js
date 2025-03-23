@@ -72,12 +72,24 @@
 
     <div id="app-container">
       <div class="control-panel">
-        <input
-          type="text"
-          id="url-input"
-          value="ws://localhost:3001"
-          placeholder="WebSocket URL"
-        />
+        <div>
+          Player ID
+          <input
+            type="text"
+            id="player-id-input"
+            value=""
+            placeholder="Player ID"
+          />
+        </div>
+        <div>
+          Server URL
+          <input
+            type="text"
+            id="url-input"
+            value="ws://localhost:3001"
+            placeholder="WebSocket URL"
+          />
+        </div>
         <button id="connect-button">Connect</button>
         <div class="status-container">
           <div id="connection-status">Disconnected</div>
@@ -91,11 +103,14 @@
       import { Player } from "./dist/player.js";
 
       // Get references to the existing HTML elements
+      const playerIdInput = document.getElementById("player-id-input");
       const urlInput = document.getElementById("url-input");
       const connectButton = document.getElementById("connect-button");
       const statusDisplay = document.getElementById("status-display");
       const connectionStatus = document.getElementById("connection-status");
       const clearLogsBtn = document.getElementById("clear-logs-btn");
+
+      playerIdInput.value = `player-${Math.floor(Math.random() * 1000)}`;
 
       // Create a custom logger that outputs to both console and status-display div
       class DisplayLogger {
@@ -212,7 +227,7 @@
 
         try {
           // Create and connect the player with our custom logger
-          player = new Player(url, logger);
+          player = new Player(playerIdInput.value, url, logger);
           player.on("close", () => {
             player = null;
             connectButton.textContent = "Connect";
