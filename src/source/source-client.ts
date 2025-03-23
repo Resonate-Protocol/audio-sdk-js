@@ -36,9 +36,7 @@ export class SourceClient {
       return;
     }
     try {
-      const parsedMessage = JSON.parse(message.toString()) as ClientMessages;
-      this.logger.log(`Received message from ${this.clientId}:`, parsedMessage);
-      this.processMessage(parsedMessage);
+      this.processMessage(JSON.parse(message.toString()));
     } catch (err) {
       this.logger.error(`Error handling message from ${this.clientId}:`, err);
       this.socket.close(1, "error handling message");
