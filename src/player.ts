@@ -14,7 +14,7 @@ export class Player extends EventEmitter {
   private sessionInfo: SessionInfo | null = null;
   private audioContext: AudioContext | null = null;
   private serverTimeDiff: number = 0; // Time difference between server and client
-  private expectClose = false;
+  private expectClose = true;
 
   constructor(
     public playerId: string,
@@ -26,13 +26,14 @@ export class Player extends EventEmitter {
 
   // Establish a WebSocket connection
   connect() {
-    this.expectClose = false;
+    this.expectClose = true;
     this.ws = new WebSocket(this.url);
     // Expect binary data as ArrayBuffer
     this.ws.binaryType = "arraybuffer";
 
     this.ws.onopen = () => {
       this.logger.log("WebSocket connected");
+      this.expectClose = false;
       this.sendHello();
       this.fire("open");
     };
