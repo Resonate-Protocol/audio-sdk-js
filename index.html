@@ -203,6 +203,7 @@
 
       // Player instance reference
       let player = null;
+      let reconnectTimeout = null;
 
       // Handle connect/disconnect button click
       connectButton.addEventListener("click", () => {
@@ -212,7 +213,12 @@
           player = null;
           connectButton.textContent = "Connect";
           connectionStatus.textContent = "Disconnected";
-          logger.log("Disconnected from server");
+          if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = null;
+          } else {
+            logger.log("Disconnected from server");
+          }
           return;
         }
 
@@ -231,7 +237,8 @@
           player.on("close", (ev) => {
             if (!ev.expected) {
               logger.error("Connection closed unexpectedly");
-              setTimeout(() => player.connect(), 5000);
+              reconnectTimeout = setTimeout(() => player.connect(), 5000);
+              connectionStatus.textContent = "Reconnecting...";
               return;
             }
             player = null;
