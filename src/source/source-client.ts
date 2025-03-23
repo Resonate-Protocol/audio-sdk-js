@@ -109,8 +109,6 @@ export class SourceClient {
   }
 
   isReady(): boolean {
-    return (
-      this.playerInfo !== null && this.socket.readyState === WebSocket.OPEN
-    );
+    return this.socket.readyState === WebSocket.OPEN;
   }
 }
