@@ -29,6 +29,7 @@ export class SourceSession {
 
     for (const clientId of this.sessionActive) {
       const client = this.clients.get(clientId);
+      console.log({ client, isReady: client?.isReady() });
       if (client && client.isReady()) {
         client.send(sessionEndMessage);
       }
@@ -49,6 +50,11 @@ export class SourceSession {
 
   // Broadcast a binary message to all clients
   sendBinary(buffer: ArrayBuffer) {
+    if (!this.clients.size) {
+      this.logger.log("No active clients, skipping audio chunk");
+      return;
+    }
+
     for (const client of this.clients.values()) {
       if (!client.isReady) {
         this.logger.log(`Client ${client.clientId} not ready, skipping`);
@@ -73,6 +79,11 @@ export class SourceSession {
     pcmData: Int16Array | Float32Array,
     timestamp: number = Date.now(),
   ) {
+    if (!this.clients.size) {
+      this.logger.log("No active clients, skipping audio chunk");
+      return;
+    }
+
     // Convert to Float32Array format if it's Int16Array
     let floatData: Float32Array[];
 

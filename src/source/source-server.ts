@@ -1,45 +1,32 @@
-import { WebSocketServer } from "ws";
-import type { ClientMessages } from "../messages.js";
+import { WebSocketServer, WebSocket } from "ws";
 import type { Logger } from "../logging.js";
 import type { SourceSession } from "./source-session.js";
 import { Source } from "./source.js";
-import { generateUniqueId } from "../util/unique-id.js";
+import { SourceClient } from "./source-client.js";
 
 export class SourceServer {
   private server: WebSocketServer | null = null;
-  private source: Source;
 
   constructor(
-    name: string,
+    private source: Source,
     public port: number,
     private logger: Logger = console,
-  ) {
-    this.source = new Source(
-      {
-        source_id: generateUniqueId("source"),
-        name,
-      },
-      logger,
-    );
-  }
+  ) {}
 
   // Start the WebSocket server
   start() {
     this.server = new WebSocketServer({ port: this.port });
     this.logger.log(`WebSocket server started on port ${this.port}`);
 
-    this.server.on("connection", (ws, request) =>
-      this.source.handleConnection(ws, request),
-    );
+    this.server.on("connection", this.handleConnection.bind(this));
     this.server.on("error", (error) => {
       this.logger.error("WebSocket server error:", error);
     });
   }
 
-  // Handle messages that PlayerClient doesn't handle
-  handleUnknownPlayerMessage(clientId: string, message: ClientMessages) {
-    this.logger.log(`Handling unknown message from ${clientId}:`, message);
-    // Handle special messages if needed
+  handleConnection(ws: WebSocket, request: any) {
+    const playerClient = new SourceClient(ws, this.logger);
+    this.source.addClient(playerClient);
   }
 
   // Start an audio session - delegates to Source

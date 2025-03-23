@@ -1,4 +1,6 @@
 import { SourceServer } from "./dist/source/source-server.js";
+import { Source } from "./dist/source/source.js";
+import { generateUniqueId } from "./dist/util/unique-id.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -60,6 +62,10 @@ function parseWavFile(filePath) {
   };
 }
 
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Main function to start the server and handle audio streaming
  */
@@ -69,7 +75,14 @@ async function main() {
     const wavData = parseWavFile(WAV_FILE);
 
     // Create and start the Source server
-    const server = new SourceServer("SDKSample", PORT, logger);
+    const source = new Source(
+      {
+        source_id: generateUniqueId("source"),
+        name: "SDKSample",
+      },
+      logger,
+    );
+    const server = new SourceServer(source, PORT, logger);
     try {
       server.start();
     } catch (error) {
@@ -78,35 +91,38 @@ async function main() {
     }
 
     // Start audio session and stream periodically
-    setTimeout(() => {
-      const playAudio = () => {
-        logger.log("");
-        logger.log("Sending WAV audio data to connected clients");
-        const session = server.startSession(
-          "pcm",
-          wavData.sampleRate,
-          wavData.channels,
-          wavData.bitDepth,
+    const playAudio = async () => {
+      logger.log("");
+      logger.log("Sending WAV audio data to connected clients");
+      const session = server.startSession(
+        "pcm",
+        wavData.sampleRate,
+        wavData.channels,
+        wavData.bitDepth,
+      );
+      let start = Date.now() + 500;
+      const timeSlice = 250; // ms
+      const bytesPerSlice =
+        (timeSlice / 1000) * wavData.sampleRate * wavData.channels;
+
+      for (let i = 0; i < wavData.audioData.length; i += bytesPerSlice) {
+        session.sendPCMAudioChunk(
+          wavData.audioData.slice(i, i + bytesPerSlice),
+          start,
         );
-        let start = Date.now() + 500;
+        start += timeSlice;
+        await sleep(timeSlice);
+      }
+      // end session after audio is done playing.
+      await sleep(start - Date.now());
+      session.end();
 
-        for (let i = 0; i < wavData.audioData.length; i += 22050) {
-          session.sendPCMAudioChunk(
-            wavData.audioData.slice(i, i + 22050),
-            start,
-          );
-          start += 250;
-        }
-        // end session after audio is done playing.
-        setTimeout(() => session.end(), start - Date.now());
-      };
-
-      // Play immediately once
+      await sleep(REPLAY_INTERVAL);
       playAudio();
+    };
 
-      // Then play periodically so new clients will eventually hear the audio
-      setInterval(playAudio, REPLAY_INTERVAL);
-    }, 10000); // Short delay to ensure server is fully started
+    // Then play periodically so new clients will eventually hear the audio
+    setTimeout(playAudio, REPLAY_INTERVAL);
 
     // Handle process termination
     process.on("SIGINT", () => {

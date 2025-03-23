@@ -1,8 +1,6 @@
-import { WebSocket } from "ws";
 import { SourceClient } from "./source-client.js";
 import { generateUniqueId } from "../util/unique-id.js";
 import { SourceSession } from "./source-session.js";
-import type { IncomingMessage } from "http";
 import type { Logger } from "../logging.js";
 import type { SourceInfo, SessionInfo } from "../messages.js";
 
@@ -12,16 +10,13 @@ export class Source {
 
   constructor(private sourceInfo: SourceInfo, private logger: Logger) {}
 
-  // Handle new client connections
-  handleConnection(ws: WebSocket, request: IncomingMessage) {
-    const clientId = generateUniqueId("client");
-    const playerClient = new SourceClient(clientId, ws, this, this.logger);
-    this.clients.set(clientId, playerClient);
-    this.logger.log(`Client connected: ${clientId}`);
+  addClient(client: SourceClient) {
+    this.clients.set(client.clientId, client);
+    this.logger.log(`Client added: ${client.clientId}`);
   }
 
   // Remove a player when they disconnect
-  removePlayer(clientId: string) {
+  removeClient(clientId: string) {
     this.clients.delete(clientId);
     this.logger.log(`Removed client: ${clientId}`);
   }
@@ -69,6 +64,7 @@ export class Source {
       this.logger,
       () => {
         // This callback is called when the session ends itself
+        this.logger.log(`Session ${sessionInfo.session_id} ended`);
         this.session = null;
       },
     );

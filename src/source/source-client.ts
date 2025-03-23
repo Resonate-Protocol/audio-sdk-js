@@ -6,34 +6,42 @@ import type {
 } from "../messages.js";
 import type { Logger } from "../logging.js";
 import type { Source } from "./source.js";
+import { generateUniqueId } from "../util/unique-id.js";
 
 export class SourceClient {
+  public clientId: string;
   public playerInfo: PlayerInfo | null = null;
+  private source?: Source;
 
   constructor(
-    public readonly clientId: string,
     public readonly socket: WebSocket,
-    private readonly sourceClients: Source,
     private readonly logger: Logger,
   ) {
+    this.clientId = generateUniqueId("client");
     this.socket.on("message", this.handleMessage.bind(this));
     this.socket.on("close", this.handleClose.bind(this));
     this.socket.on("error", this.handleError.bind(this));
   }
 
+  public attachSource(source: Source) {
+    this.source = source;
+    this.sendSourceHello();
+  }
+
   private handleMessage(message: any) {
-    if (typeof message === "string") {
-      try {
-        const parsedMessage = JSON.parse(message) as ClientMessages;
-        this.logger.log(
-          `Received message from ${this.clientId}:`,
-          parsedMessage,
-        );
-        this.processMessage(parsedMessage);
-      } catch (err) {
-        this.logger.error(`Error handling message from ${this.clientId}:`, err);
-        this.socket.close(1, "error handling message");
-      }
+    if (typeof message !== "string") {
+      this.logger.error(
+        `Client ${this.clientId} received unexpected binary message`,
+      );
+      return;
+    }
+    try {
+      const parsedMessage = JSON.parse(message) as ClientMessages;
+      this.logger.log(`Received message from ${this.clientId}:`, parsedMessage);
+      this.processMessage(parsedMessage);
+    } catch (err) {
+      this.logger.error(`Error handling message from ${this.clientId}:`, err);
+      this.socket.close(1, "error handling message");
     }
   }
 
@@ -54,13 +62,16 @@ export class SourceClient {
   private handlePlayerHello(playerInfo: PlayerInfo) {
     this.playerInfo = playerInfo;
     this.logger.log("Player connected:", playerInfo);
-    this.sendSourceHello();
   }
 
   sendSourceHello() {
+    if (!this.source) {
+      throw new Error("Source not attached");
+    }
+
     const sourceHelloMessage = {
       type: "source/hello" as const,
-      payload: this.sourceClients.getSourceInfo(),
+      payload: this.source.getSourceInfo(),
     };
 
     this.send(sourceHelloMessage);
@@ -83,7 +94,10 @@ export class SourceClient {
 
   private handleClose() {
     this.logger.log(`Player ${this.clientId} disconnected`);
-    this.sourceClients.removePlayer(this.clientId);
+    if (this.source) {
+      this.source.removeClient(this.clientId);
+      this.source = undefined;
+    }
   }
 
   private handleError(error: Error) {
