@@ -11,6 +11,7 @@ export class Source {
   constructor(private sourceInfo: SourceInfo, private logger: Logger) {}
 
   addClient(client: SourceClient) {
+    client.attachSource(this);
     this.clients.set(client.clientId, client);
     this.logger.log(`Client added: ${client.clientId}`);
   }
