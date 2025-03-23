@@ -100,7 +100,7 @@
     </div>
 
     <script type="module">
-      import { Player } from "./dist/player.js";
+      import { Player } from "./dist/player/player.js";
 
       // Get references to the existing HTML elements
       const playerIdInput = document.getElementById("player-id-input");
@@ -237,7 +237,7 @@
           player.on("close", (ev) => {
             if (!ev.expected) {
               logger.error("Connection closed unexpectedly");
-              reconnectTimeout = setTimeout(() => player.connect(), 5000);
+              reconnectTimeout = setTimeout(() => player.connect(true), 5000);
               connectionStatus.textContent = "Reconnecting...";
               return;
             }

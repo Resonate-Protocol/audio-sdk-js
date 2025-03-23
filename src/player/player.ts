@@ -4,9 +4,9 @@ import {
   ServerMessages,
   BinaryMessageType,
   PlayerHelloMessage,
-} from "./messages.js";
-import type { Logger } from "./logging.js";
-import { EventEmitter } from "./util/event-emitter.js";
+} from "../messages.js";
+import type { Logger } from "../logging.js";
+import { EventEmitter } from "../util/event-emitter.js";
 
 export class Player extends EventEmitter {
   private ws: WebSocket | null = null;
@@ -25,8 +25,8 @@ export class Player extends EventEmitter {
   }
 
   // Establish a WebSocket connection
-  connect() {
-    this.expectClose = true;
+  connect(isReconnect: boolean = false) {
+    this.expectClose = !isReconnect;
     this.ws = new WebSocket(this.url);
     // Expect binary data as ArrayBuffer
     this.ws.binaryType = "arraybuffer";

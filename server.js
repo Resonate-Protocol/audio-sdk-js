@@ -106,15 +106,20 @@ async function main() {
         (timeSlice / 1000) * wavData.sampleRate * wavData.channels;
 
       for (let i = 0; i < wavData.audioData.length; i += bytesPerSlice) {
-        session.sendPCMAudioChunk(
-          wavData.audioData.slice(i, i + bytesPerSlice),
-          start,
-        );
-        start += timeSlice;
-        await sleep(timeSlice);
+        const chunk = wavData.audioData.slice(i, i + bytesPerSlice);
+        session.sendPCMAudioChunk(chunk, start);
+        const sleepDuration = start - Date.now();
+        // Usually equal to timeSlice, but shorter for last chunk
+        start += (chunk.length / bytesPerSlice) * timeSlice;
+        await sleep(sleepDuration);
       }
       // end session after audio is done playing.
-      await sleep(start - Date.now());
+      await sleep(
+        start -
+          Date.now() +
+          // some extra time to make sure all clients have received the audio
+          100,
+      );
       session.end();
 
       await sleep(REPLAY_INTERVAL);
