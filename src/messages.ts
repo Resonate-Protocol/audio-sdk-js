@@ -75,7 +75,21 @@ export interface StreamCommandMessage {
   };
 }
 
-export type ClientMessages = PlayerHelloMessage | StreamCommandMessage;
+export interface PlayerState {
+  state: "playing" | "paused" | "idle";
+  volume: number;
+  muted: boolean;
+}
+
+export interface PlayerStateMessage {
+  type: "player/state";
+  payload: PlayerState;
+}
+
+export type ClientMessages =
+  | PlayerHelloMessage
+  | StreamCommandMessage
+  | PlayerStateMessage;
 
 export type ServerMessages =
   | SessionStartMessage

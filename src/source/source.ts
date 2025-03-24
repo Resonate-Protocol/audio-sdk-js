@@ -11,8 +11,22 @@ export class Source {
   constructor(private sourceInfo: SourceInfo, private logger: Logger) {}
 
   addClient(client: SourceClient) {
-    client.attachSource(this);
+    client.send({
+      type: "source/hello" as const,
+      payload: this.getSourceInfo(),
+    });
     this.clients.set(client.clientId, client);
+
+    client.on("close", () => {
+      this.removeClient(client.clientId);
+    });
+    client.on("player-state", (state) => {
+      console.log(`Unhandled player state from ${client.clientId}:`, state);
+    });
+    client.on("stream-command", (command) => {
+      console.log(`Unhandled stream command from ${client.clientId}:`, command);
+    });
+
     this.logger.log(`Client added: ${client.clientId}`);
   }
 

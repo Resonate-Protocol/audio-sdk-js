@@ -3,29 +3,33 @@ import type {
   PlayerInfo,
   ServerMessages,
   ClientMessages,
+  PlayerState,
+  StreamCommandMessage,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
-import type { Source } from "./source.js";
 import { generateUniqueId } from "../util/unique-id.js";
+import { EventEmitter } from "../util/event-emitter.js";
 
-export class SourceClient {
+interface SourceClientEvents {
+  close: void;
+  "player-state": PlayerState | null;
+  "stream-command": StreamCommandMessage["payload"];
+}
+
+export class SourceClient extends EventEmitter<SourceClientEvents> {
   public clientId: string;
   public playerInfo: PlayerInfo | null = null;
-  private source?: Source;
+  public playerState: PlayerState | null = null;
 
   constructor(
     public readonly socket: WebSocket,
     private readonly logger: Logger,
   ) {
+    super();
     this.clientId = generateUniqueId("client");
     this.socket.on("message", this.handleMessage.bind(this));
     this.socket.on("close", this.handleClose.bind(this));
     this.socket.on("error", this.handleError.bind(this));
-  }
-
-  public attachSource(source: Source) {
-    this.source = source;
-    this.sendSourceHello();
   }
 
   private handleMessage(message: any, isBinary: boolean) {
@@ -44,22 +48,26 @@ export class SourceClient {
   }
 
   private processMessage(message: ClientMessages) {
+    if (message.type === "player/hello") {
+      this.handlePlayerHello(message.payload);
+      return;
+    }
+
+    if (!this.playerInfo) {
+      this.logger.error(
+        `Client ${this.clientId} sent message before player hello`,
+      );
+      return;
+    }
+
     switch (message.type) {
-      case "player/hello":
-        this.handlePlayerHello(message.payload);
+      case "stream/command":
+        this.fire("stream-command", message.payload);
         break;
 
-      case "stream/command":
-        if (this.source) {
-          this.source.handleStreamCommand(
-            this.clientId,
-            message.payload.command,
-          );
-        } else {
-          this.logger.error(
-            `Client ${this.clientId} sent stream command without source`,
-          );
-        }
+      case "player/state":
+        this.playerState = message.payload;
+        this.fire("player-state", message.payload);
         break;
 
       default:
@@ -74,19 +82,6 @@ export class SourceClient {
   private handlePlayerHello(playerInfo: PlayerInfo) {
     this.playerInfo = playerInfo;
     this.logger.log("Player info received:", playerInfo);
-  }
-
-  sendSourceHello() {
-    if (!this.source) {
-      throw new Error("Source not attached");
-    }
-
-    const sourceHelloMessage = {
-      type: "source/hello" as const,
-      payload: this.source.getSourceInfo(),
-    };
-
-    this.send(sourceHelloMessage);
   }
 
   send(message: ServerMessages) {
@@ -106,10 +101,7 @@ export class SourceClient {
 
   private handleClose() {
     this.logger.log(`Player ${this.clientId} disconnected`);
-    if (this.source) {
-      this.source.removeClient(this.clientId);
-      this.source = undefined;
-    }
+    this.fire("close");
   }
 
   private handleError(error: Error) {
