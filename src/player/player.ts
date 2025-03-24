@@ -4,6 +4,7 @@ import {
   ServerMessages,
   BinaryMessageType,
   PlayerHelloMessage,
+  Metadata,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
 import { EventEmitter } from "../util/event-emitter.js";
@@ -13,6 +14,7 @@ type Events = {
   close: { expected: boolean };
   "source-update": SourceInfo | null;
   "session-update": SessionInfo | null;
+  "metadata-update": Metadata | null;
 };
 
 export interface PlayerOptions {
@@ -28,6 +30,7 @@ export class Player extends EventEmitter<Events> {
   private sourceInfo: SourceInfo | null = null;
   private sessionInfo: SessionInfo | null = null;
   private audioContext: AudioContext | null = null;
+  private metadata: Metadata | null = null;
   private serverTimeDiff: number = 0; // Time difference between server and client
   private expectClose = true;
 
@@ -136,6 +139,13 @@ export class Player extends EventEmitter<Events> {
         }
         // Clear session information when session ends.
         this.sessionInfo = null;
+        break;
+
+      case "metadata/update":
+        this.metadata = this.metadata
+          ? { ...this.metadata, ...message.payload }
+          : (message.payload as Metadata);
+        this.fire("metadata-update", this.metadata);
         break;
 
       default:

@@ -49,12 +49,33 @@ export interface SessionEndMessage {
   };
 }
 
+export type MediaCommand = "play" | "pause" | "stop" | "seek" | "volume";
+
+export interface Metadata {
+  title: string;
+  artist: string;
+  album: string;
+  year: number;
+  track: number;
+  genre: string;
+  group_members: string[];
+  support_commands: MediaCommand[];
+  repeat: "off" | "one" | "all";
+  shuffle: boolean;
+}
+
+export interface MetadataUpdateMessage {
+  type: "metadata/update";
+  payload: Partial<Metadata>;
+}
+
 export type ClientMessages = PlayerHelloMessage;
 
 export type ServerMessages =
   | SessionStartMessage
   | SessionEndMessage
-  | SourceHelloMessage;
+  | SourceHelloMessage
+  | MetadataUpdateMessage;
 
 export enum BinaryMessageType {
   PlayAudioChunk = 1,
