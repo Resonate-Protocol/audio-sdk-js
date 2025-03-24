@@ -78,4 +78,8 @@ export class Source {
   getSession(): SourceSession | null {
     return this.session;
   }
+
+  handleStreamCommand(clientId: string, command: string) {
+    throw new Error("Method not implemented.");
+  }
 }

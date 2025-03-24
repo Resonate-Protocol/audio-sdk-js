@@ -49,9 +49,23 @@ export class SourceClient {
         this.handlePlayerHello(message.payload);
         break;
 
+      case "stream/command":
+        if (this.source) {
+          this.source.handleStreamCommand(
+            this.clientId,
+            message.payload.command,
+          );
+        } else {
+          this.logger.error(
+            `Client ${this.clientId} sent stream command without source`,
+          );
+        }
+        break;
+
       default:
         this.logger.log(
           `Unhandled message type from ${this.clientId}:`,
+          // @ts-expect-error
           message.type,
         );
     }

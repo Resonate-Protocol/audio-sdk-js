@@ -22,11 +22,6 @@ export interface PlayerInfo {
   media_display_size: string | null;
 }
 
-export interface PlayerHelloMessage {
-  type: "player/hello";
-  payload: PlayerInfo;
-}
-
 export interface SourceInfo {
   source_id: string;
   name: string;
@@ -52,12 +47,11 @@ export interface SessionEndMessage {
 export type MediaCommand = "play" | "pause" | "stop" | "seek" | "volume";
 
 export interface Metadata {
-  title: string;
-  artist: string;
-  album: string;
-  year: number;
-  track: number;
-  genre: string;
+  title: string | null;
+  artist: string | null;
+  album: string | null;
+  year: number | null;
+  track: number | null;
   group_members: string[];
   support_commands: MediaCommand[];
   repeat: "off" | "one" | "all";
@@ -69,7 +63,19 @@ export interface MetadataUpdateMessage {
   payload: Partial<Metadata>;
 }
 
-export type ClientMessages = PlayerHelloMessage;
+export interface PlayerHelloMessage {
+  type: "player/hello";
+  payload: PlayerInfo;
+}
+
+export interface StreamCommandMessage {
+  type: "stream/command";
+  payload: {
+    command: MediaCommand;
+  };
+}
+
+export type ClientMessages = PlayerHelloMessage | StreamCommandMessage;
 
 export type ServerMessages =
   | SessionStartMessage
