@@ -111,6 +111,7 @@
       const clearLogsBtn = document.getElementById("clear-logs-btn");
 
       playerIdInput.value = `player-${Math.floor(Math.random() * 1000)}`;
+      urlInput.value = `ws://${window.location.hostname}:3001`;
 
       // Create a custom logger that outputs to both console and status-display div
       class DisplayLogger {
