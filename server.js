@@ -101,7 +101,7 @@ async function main() {
         wavData.bitDepth,
       );
       let start = performance.timeOrigin + performance.now() + 500;
-      const timeSlice = 250; // ms
+      const timeSlice = 50; // ms
       const bytesPerSlice =
         (timeSlice / 1000) * wavData.sampleRate * wavData.channels;
 
@@ -112,11 +112,14 @@ async function main() {
           // We send microsecond timestamp as integer
           Math.round(start * 1000),
         );
-        const sleepDuration =
-          start - performance.timeOrigin - performance.now();
         // Usually equal to timeSlice, but shorter for last chunk
         start += (chunk.length / bytesPerSlice) * timeSlice;
-        await sleep(sleepDuration);
+        
+        // Send the audio if it should start playing within 1000 ms
+        const sleepDuration = start - performance.timeOrigin - performance.now()-1000;
+        if (sleepDuration > 0) {
+          await sleep(sleepDuration);
+        }
       }
       // end session after audio is done playing.
       await sleep(
