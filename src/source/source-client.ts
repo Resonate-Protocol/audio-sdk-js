@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import type {
   PlayerInfo,
+  PlayerTimeInfo,
   ServerMessages,
   ClientMessages,
   PlayerState,
@@ -69,7 +70,9 @@ export class SourceClient extends EventEmitter<SourceClientEvents> {
         this.playerState = message.payload;
         this.fire("player-state", message.payload);
         break;
-
+      case "player/time":
+        this.handlePlayerTime(message.payload);
+        break;
       default:
         this.logger.log(
           `Unhandled message type from ${this.clientId}:`,
@@ -82,6 +85,17 @@ export class SourceClient extends EventEmitter<SourceClientEvents> {
   private handlePlayerHello(playerInfo: PlayerInfo) {
     this.playerInfo = playerInfo;
     this.logger.log("Player info received:", playerInfo);
+  }
+
+  private handlePlayerTime(playerTimeInfo: PlayerTimeInfo) {
+    const sourceTimeInfo = playerTimeInfo;
+    sourceTimeInfo.source_received = Math.round((performance.timeOrigin + performance.now())*1000);
+    sourceTimeInfo.source_transmitted = Math.round((performance.timeOrigin + performance.now())*1000);
+    const timeResponseMessage = {
+      type: "source/time" as const,
+      payload: sourceTimeInfo,
+    };
+    this.send(timeResponseMessage);
   }
 
   send(message: ServerMessages) {
