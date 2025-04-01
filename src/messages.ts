@@ -34,11 +34,6 @@ export interface SourceTimeInfo {
   source_transmitted: number;
 }
 
-export interface PlayerHelloMessage {
-  type: "player/hello";
-  payload: PlayerInfo;
-}
-
 export interface PlayerTimeMessage {
   type: "player/time";
   payload: PlayerTimeInfo;
