@@ -24,8 +24,6 @@ export interface PlayerInfo {
 
 export interface PlayerTimeInfo {
   player_transmitted: number;
-  source_received: number;
-  source_transmitted: number;
 }
 
 export interface SourceTimeInfo {

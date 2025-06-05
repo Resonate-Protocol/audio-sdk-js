@@ -5,6 +5,8 @@ import {
   BinaryMessageType,
   PlayerHelloMessage,
   Metadata,
+  SourceTimeInfo,
+  PlayerTimeMessage,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
 import { EventEmitter } from "../util/event-emitter.js";
@@ -49,10 +51,17 @@ export class Player extends EventEmitter<Events> {
     // Expect binary data as ArrayBuffer
     this.ws.binaryType = "arraybuffer";
 
+    let timeSyncInterval: number | null = null;
+
     this.ws.onopen = () => {
       this.logger.log("WebSocket connected");
       this.expectClose = false;
       this.sendHello();
+      this.sendPlayerTime();
+      timeSyncInterval = window.setInterval(() => {
+        this.sendPlayerTime();
+      }, 5000);
+
       this.fire("open");
     };
 
@@ -61,7 +70,7 @@ export class Player extends EventEmitter<Events> {
       if (typeof event.data === "string") {
         try {
           const message = JSON.parse(event.data);
-          this.handleTextMessage(message);
+          this.handleTextMessage(message, event.timeStamp);
         } catch (err) {
           this.logger.error("Error parsing message", err);
         }
@@ -72,10 +81,12 @@ export class Player extends EventEmitter<Events> {
 
     this.ws.onerror = (error) => {
       this.logger.error("WebSocket error:", error);
+      clearInterval(timeSyncInterval!);
     };
 
     this.ws.onclose = () => {
       this.logger.log("WebSocket connection closed");
+      clearInterval(timeSyncInterval!);
       this.fire("close", {
         expected: this.expectClose,
       });
@@ -103,8 +114,19 @@ export class Player extends EventEmitter<Events> {
     this.ws!.send(JSON.stringify(helloMsg));
   }
 
+  sendPlayerTime() {
+    const timeMsg: PlayerTimeMessage = {
+      type: "player/time",
+      payload: {
+        player_transmitted: performance.now() * 1000,
+      },
+    };
+    this.ws!.send(JSON.stringify(timeMsg));
+    this.logger.log("Sent player/time:", timeMsg.payload.player_transmitted);
+  }
+
   // Handle text (JSON) messages from the server.
-  handleTextMessage(message: ServerMessages) {
+  handleTextMessage(message: ServerMessages, receivedAt: number) {
     this.logger.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
@@ -146,6 +168,11 @@ export class Player extends EventEmitter<Events> {
           ? { ...this.metadata, ...message.payload }
           : (message.payload as Metadata);
         this.fire("metadata-update", this.metadata);
+        break;
+
+      case "source/time":
+        // Pass player_received time to the handler
+        this.handleSourceTime(message.payload, receivedAt);
         break;
 
       default:
@@ -295,6 +322,40 @@ export class Player extends EventEmitter<Events> {
       );
       source.start(startTimeInAudioContext);
     }
+  }
+
+  handleSourceTime(payload: SourceTimeInfo, receivedAt: number) {
+    const { player_transmitted, source_received, source_transmitted } = payload;
+
+    // 1. Calculate the raw offset from this message
+    const rawOffsetMicroseconds = Math.round(
+      (source_received -
+        player_transmitted +
+        (source_transmitted - receivedAt)) /
+        2,
+    );
+
+    this.logger.log(
+      `Raw clock offset: ${rawOffsetMicroseconds} us (source_received: ${source_received} us, player_transmitted: ${player_transmitted} us, source_transmitted: ${source_transmitted} us, player_received: ${receivedAt} us)`,
+    );
+
+    // // 2. Apply Exponential Moving Average (EMA)
+    // // If it's the first measurement, use it directly, otherwise apply filter
+    // if (this.clockOffsetMicroseconds === 0) {
+    //   // Or use another flag if 0 is a valid offset
+    //   this.clockOffsetMicroseconds = rawOffsetMicroseconds;
+    // } else {
+    //   this.clockOffsetMicroseconds =
+    //     this.smoothingFactorAlpha * rawOffsetMicroseconds +
+    //     (1 - this.smoothingFactorAlpha) * this.clockOffsetMicroseconds;
+    // }
+
+    // // Round the smoothed value for cleaner logs if desired
+    // this.clockOffsetMicroseconds = Math.round(this.clockOffsetMicroseconds);
+
+    // this.logger.log(
+    //   `Updated smoothed clock offset: ${this.clockOffsetMicroseconds} us (raw: ${rawOffsetMicroseconds} us)`,
+    // );
   }
 
   // Close the WebSocket connection and clean up resources.

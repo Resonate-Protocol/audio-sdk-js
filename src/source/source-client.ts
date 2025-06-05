@@ -88,12 +88,17 @@ export class SourceClient extends EventEmitter<SourceClientEvents> {
   }
 
   private handlePlayerTime(playerTimeInfo: PlayerTimeInfo) {
-    const sourceTimeInfo = playerTimeInfo;
-    sourceTimeInfo.source_received = Math.round((performance.timeOrigin + performance.now())*1000);
-    sourceTimeInfo.source_transmitted = Math.round((performance.timeOrigin + performance.now())*1000);
     const timeResponseMessage = {
       type: "source/time" as const,
-      payload: sourceTimeInfo,
+      payload: {
+        player_transmitted: playerTimeInfo.player_transmitted,
+        source_received: Math.round(
+          (performance.timeOrigin + performance.now()) * 1000,
+        ),
+        source_transmitted: Math.round(
+          (performance.timeOrigin + performance.now()) * 1000,
+        ),
+      },
     };
     this.send(timeResponseMessage);
   }
