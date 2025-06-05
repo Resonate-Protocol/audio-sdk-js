@@ -88,7 +88,7 @@ export class Player extends EventEmitter<Events> {
       type: "player/hello",
       payload: {
         player_id: this.options.playerId,
-        name: "PlayerClient",
+        name: this.options.playerId,
         role: "player",
         support_codecs: ["pcm"],
         support_channels: [2],
