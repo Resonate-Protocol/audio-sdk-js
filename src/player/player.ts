@@ -25,6 +25,9 @@ export interface PlayerOptions {
   logger?: Logger;
 }
 
+// Use standard AudioContext or fallback to webkitAudioContext
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
 export class Player extends EventEmitter<Events> {
   private options: PlayerOptions;
   private logger: Logger = console;
@@ -55,13 +58,13 @@ export class Player extends EventEmitter<Events> {
 
     this.ws.onopen = () => {
       this.logger.log("WebSocket connected");
+      this.audioContext = new AudioContextClass();
       this.expectClose = false;
       this.sendHello();
       this.sendPlayerTime();
       timeSyncInterval = window.setInterval(() => {
         this.sendPlayerTime();
       }, 5000);
-
       this.fire("open");
     };
 
@@ -70,7 +73,7 @@ export class Player extends EventEmitter<Events> {
       if (typeof event.data === "string") {
         try {
           const message = JSON.parse(event.data);
-          this.handleTextMessage(message, event.timeStamp);
+          this.handleTextMessage(message, this.audioContext!.currentTime);
         } catch (err) {
           this.logger.error("Error parsing message", err);
         }
@@ -81,12 +84,13 @@ export class Player extends EventEmitter<Events> {
 
     this.ws.onerror = (error) => {
       this.logger.error("WebSocket error:", error);
-      clearInterval(timeSyncInterval!);
     };
 
     this.ws.onclose = () => {
       this.logger.log("WebSocket connection closed");
-      clearInterval(timeSyncInterval!);
+      clearTimeout(timeSyncInterval!);
+      this.audioContext!.close();
+      this.audioContext = null;
       this.fire("close", {
         expected: this.expectClose,
       });
@@ -118,7 +122,7 @@ export class Player extends EventEmitter<Events> {
     const timeMsg: PlayerTimeMessage = {
       type: "player/time",
       payload: {
-        player_transmitted: performance.now() * 1000,
+        player_transmitted: this.audioContext!.currentTime * 1000,
       },
     };
     this.ws!.send(JSON.stringify(timeMsg));
@@ -140,25 +144,15 @@ export class Player extends EventEmitter<Events> {
         this.sessionInfo = message.payload;
         this.fire("session-update", this.sessionInfo);
 
-        // Use standard AudioContext or fallback to webkitAudioContext
-        const AudioContextClass =
-          window.AudioContext || window.webkitAudioContext;
-        this.audioContext = new AudioContextClass();
-
         // Convert server time to seconds for consistent unit with audioContext.currentTime
         this.serverTimeDiff =
-          this.sessionInfo.now / 1000000 - this.audioContext.currentTime;
+          this.sessionInfo.now / 1000000 - this.audioContext!.currentTime;
         this.logger.log(`Server time difference: ${this.serverTimeDiff}s`);
         break;
 
       case "session/end":
         this.logger.log("Session ended");
         this.fire("session-update", null);
-        // Clean up AudioContext when the session ends
-        if (this.audioContext && this.audioContext.state !== "closed") {
-          this.audioContext.close();
-          this.audioContext = null;
-        }
         // Clear session information when session ends.
         this.sessionInfo = null;
         break;
