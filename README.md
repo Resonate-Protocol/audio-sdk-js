@@ -1,4 +1,4 @@
-# Improv Audio Player Example
+# Resonate Audio Player Example
 
 A simple example of an audio player implementation using WebSockets.
 
