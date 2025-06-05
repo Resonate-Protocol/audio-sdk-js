@@ -37,6 +37,8 @@ export class Player extends EventEmitter<Events> {
   private audioContext: AudioContext | null = null;
   private metadata: Metadata | null = null;
   private serverTimeDiff: number = 0; // Time difference between server and client
+  private serverTimeDiffSamples: number[] = []; // Store last 50 samples for median
+  private readonly maxTimeDiffSamples = 50;
   private expectClose = true;
 
   constructor(options: PlayerOptions) {
@@ -319,16 +321,34 @@ export class Player extends EventEmitter<Events> {
   handleSourceTime(payload: SourceTimeInfo, receivedAt: number) {
     const { player_transmitted, source_received, source_transmitted } = payload;
 
-    // TODO track last 50 results and take median
-    // Calculate the raw offset from this message
-    this.serverTimeDiff =
+    // Calculate the raw offset from this message (in seconds)
+    const offset =
       (source_received -
         player_transmitted +
         (source_transmitted - receivedAt)) /
       2 /
-      1000000; // Convert to seconds
+      1000000;
 
-    this.logger.log(`Server time difference: ${this.serverTimeDiff} s`);
+    // Store the offset sample
+    this.serverTimeDiffSamples.push(offset);
+    if (this.serverTimeDiffSamples.length > this.maxTimeDiffSamples) {
+      this.serverTimeDiffSamples.shift();
+    }
+
+    // Calculate the median of the samples for a stable offset
+    const sorted = [...this.serverTimeDiffSamples].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    let median: number;
+    if (sorted.length % 2 === 0) {
+      median = (sorted[mid - 1] + sorted[mid]) / 2;
+    } else {
+      median = sorted[mid];
+    }
+    this.serverTimeDiff = median;
+
+    this.logger.log(
+      `Server time difference (median of ${sorted.length}): ${this.serverTimeDiff} s`,
+    );
   }
 
   // Close the WebSocket connection and clean up resources.
