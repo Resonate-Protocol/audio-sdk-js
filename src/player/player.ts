@@ -153,6 +153,11 @@ export class Player extends EventEmitter<Events> {
       case "session/end":
         this.logger.log("Session ended");
         this.fire("session-update", null);
+        // Re-instate the audioContext or else the old buffer keeps playing.
+        this.audioContext!.close();
+        this.audioContext = new AudioContextClass();
+        // Sync player time with the server.
+        this.sendPlayerTime();
         // Clear session information when session ends.
         this.sessionInfo = null;
         break;
