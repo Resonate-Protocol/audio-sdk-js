@@ -319,7 +319,8 @@ export class Player extends EventEmitter<Events> {
   handleSourceTime(payload: SourceTimeInfo, receivedAt: number) {
     const { player_transmitted, source_received, source_transmitted } = payload;
 
-    // 1. Calculate the raw offset from this message
+    // TODO track last 50 results and take median
+    // Calculate the raw offset from this message
     this.serverTimeDiff =
       (source_received -
         player_transmitted +
@@ -328,24 +329,6 @@ export class Player extends EventEmitter<Events> {
       1000000; // Convert to seconds
 
     this.logger.log(`Server time difference: ${this.serverTimeDiff} s`);
-
-    // // 2. Apply Exponential Moving Average (EMA)
-    // // If it's the first measurement, use it directly, otherwise apply filter
-    // if (this.clockOffsetMicroseconds === 0) {
-    //   // Or use another flag if 0 is a valid offset
-    //   this.clockOffsetMicroseconds = rawOffsetMicroseconds;
-    // } else {
-    //   this.clockOffsetMicroseconds =
-    //     this.smoothingFactorAlpha * rawOffsetMicroseconds +
-    //     (1 - this.smoothingFactorAlpha) * this.clockOffsetMicroseconds;
-    // }
-
-    // // Round the smoothed value for cleaner logs if desired
-    // this.clockOffsetMicroseconds = Math.round(this.clockOffsetMicroseconds);
-
-    // this.logger.log(
-    //   `Updated smoothed clock offset: ${this.clockOffsetMicroseconds} us (raw: ${rawOffsetMicroseconds} us)`,
-    // );
   }
 
   // Close the WebSocket connection and clean up resources.
