@@ -73,7 +73,10 @@ export class Player extends EventEmitter<Events> {
       if (typeof event.data === "string") {
         try {
           const message = JSON.parse(event.data);
-          this.handleTextMessage(message, this.audioContext!.currentTime);
+          this.handleTextMessage(
+            message,
+            this.audioContext!.currentTime * 1000000,
+          );
         } catch (err) {
           this.logger.error("Error parsing message", err);
         }
@@ -122,7 +125,7 @@ export class Player extends EventEmitter<Events> {
     const timeMsg: PlayerTimeMessage = {
       type: "player/time",
       payload: {
-        player_transmitted: this.audioContext!.currentTime * 1000,
+        player_transmitted: this.audioContext!.currentTime * 1000000,
       },
     };
     this.ws!.send(JSON.stringify(timeMsg));
@@ -143,11 +146,6 @@ export class Player extends EventEmitter<Events> {
         this.logger.log("Session started", message.payload);
         this.sessionInfo = message.payload;
         this.fire("session-update", this.sessionInfo);
-
-        // Convert server time to seconds for consistent unit with audioContext.currentTime
-        this.serverTimeDiff =
-          this.sessionInfo.now / 1000000 - this.audioContext!.currentTime;
-        this.logger.log(`Server time difference: ${this.serverTimeDiff}s`);
         break;
 
       case "session/end":
@@ -322,16 +320,14 @@ export class Player extends EventEmitter<Events> {
     const { player_transmitted, source_received, source_transmitted } = payload;
 
     // 1. Calculate the raw offset from this message
-    const rawOffsetMicroseconds = Math.round(
+    this.serverTimeDiff =
       (source_received -
         player_transmitted +
         (source_transmitted - receivedAt)) /
-        2,
-    );
+      2 /
+      1000000; // Convert to seconds
 
-    this.logger.log(
-      `Raw clock offset: ${rawOffsetMicroseconds} us (source_received: ${source_received} us, player_transmitted: ${player_transmitted} us, source_transmitted: ${source_transmitted} us, player_received: ${receivedAt} us)`,
-    );
+    this.logger.log(`Server time difference: ${this.serverTimeDiff} s`);
 
     // // 2. Apply Exponential Moving Average (EMA)
     // // If it's the first measurement, use it directly, otherwise apply filter
