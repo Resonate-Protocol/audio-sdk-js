@@ -121,7 +121,7 @@ async function main() {
         year: null,
         track: null,
         group_members: [],
-        support_commands: [],
+        support_commands: ["play", "pause"],
         repeat: "off",
         shuffle: false,
       });
@@ -141,7 +141,7 @@ async function main() {
             year: null,
             track: null,
             group_members: [],
-            support_commands: [],
+            support_commands: ["play", "pause"],
             repeat: "off",
             shuffle: false,
           });

@@ -23,8 +23,11 @@ export class ServerSession {
     private readonly onSessionEnd: () => void,
   ) {}
 
+  // TODO we should extract a ServerGroup class that handles group member actions
+  // like join, unjoin etc.
   public addClient(client: ServerClient) {
     this.clients.set(client.clientId, client);
+    // TODO update metadata on all clients with group members
     this.logger.log(
       `Client ${client.clientId} added to session ${this.sessionInfo.session_id}`,
     );
@@ -41,6 +44,7 @@ export class ServerSession {
       payload = {};
       // Find updated fields
       for (const key in metadata) {
+        // TODO this does not work for values that are lists: group_members, support_commands
         // @ts-ignore
         if (this._lastReportedMetadata[key] !== metadata[key]) {
           // @ts-ignore

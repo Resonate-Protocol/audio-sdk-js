@@ -30,9 +30,11 @@ export class MusicServer extends EventEmitter<MusicServerEvents> {
     client.on("close", () => {
       this.removeClient(client.clientId);
     });
+    // TODO handle this in server-session.ts. How to handle player state updates?
     client.on("player-state", (state) => {
       console.log(`Unhandled player state from ${client.clientId}:`, state);
     });
+    // TODO handle this in server-session.ts. Ending a session should also remove all listeners from clients
     client.on("stream-command", (command) => {
       console.log(`Unhandled stream command from ${client.clientId}:`, command);
     });
