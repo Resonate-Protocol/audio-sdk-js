@@ -96,6 +96,7 @@
           <div id="status-display" class="status"></div>
           <button class="clear-logs" id="clear-logs-btn">Clear Logs</button>
         </div>
+        <div id="metadata" class="metadata"></div>
       </div>
     </div>
 
@@ -109,6 +110,7 @@
       const statusDisplay = document.getElementById("status-display");
       const connectionStatus = document.getElementById("connection-status");
       const clearLogsBtn = document.getElementById("clear-logs-btn");
+      const metadata = document.getElementById("metadata");
 
       playerIdInput.value = `player-${Math.floor(Math.random() * 1000)}`;
       urlInput.value = `ws://${window.location.hostname}:3001`;
@@ -239,6 +241,16 @@
             url,
             logger,
           });
+          player.on("metadata-update", (data) => {
+            metadata.innerHTML = data
+              ? `<strong>Metadata:</strong><br><pre>${JSON.stringify(
+                  data,
+                  undefined,
+                  2,
+                )}</pre>`
+              : "";
+            logger.log("Received metadata:", data);
+          });
           player.on("close", (ev) => {
             if (!ev.expected) {
               logger.error("Connection closed unexpectedly");
@@ -249,6 +261,7 @@
             player = null;
             connectButton.textContent = "Connect";
             connectionStatus.textContent = "Disconnected";
+            metadata.innerHTML = "";
             logger.log("Disconnected from server");
           });
           player.connect();

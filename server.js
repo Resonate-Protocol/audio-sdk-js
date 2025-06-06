@@ -99,12 +99,38 @@ async function main() {
         wavData.channels,
         wavData.bitDepth,
       );
+      session.sendMetadata({
+        title: "Sample Audio",
+        artist: "Someone on the internet",
+        album: null,
+        year: null,
+        track: null,
+        group_members: [],
+        support_commands: [],
+        repeat: "off",
+        shuffle: false,
+      });
       let start = performance.timeOrigin + performance.now() + 500;
       const timeSlice = 50; // ms
       const bytesPerSlice =
         (timeSlice / 1000) * wavData.sampleRate * wavData.channels;
 
       for (let i = 0; i < wavData.audioData.length; i += bytesPerSlice) {
+        // Mimick metadata update
+        if (i % (bytesPerSlice * 10) === 0) {
+          session.sendMetadata({
+            title: `Sample Audio ${i}`,
+            artist: "Someone on the internet",
+            album: null,
+            year: null,
+            track: null,
+            group_members: [],
+            support_commands: [],
+            repeat: "off",
+            shuffle: false,
+          });
+        }
+
         const chunk = wavData.audioData.slice(i, i + bytesPerSlice);
         session.sendPCMAudioChunk(
           chunk,

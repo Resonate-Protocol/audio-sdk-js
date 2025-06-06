@@ -2,6 +2,10 @@ import {
   SessionInfo,
   BinaryMessageType,
   SessionEndMessage,
+  Metadata,
+  MetadataUpdateMessage,
+  ClientMessages,
+  ServerMessages,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
 import { ServerClient } from "./server-client.js";
@@ -11,6 +15,8 @@ const HEADER_SIZE = 13;
 export class ServerSession {
   sessionActive: Set<string> = new Set();
 
+  private _lastReportedMetadata: Metadata | null = null;
+
   constructor(
     private readonly sessionInfo: SessionInfo,
     private readonly clients: Map<string, ServerClient>,
@@ -18,15 +24,48 @@ export class ServerSession {
     private readonly onSessionEnd: () => void,
   ) {}
 
-  end() {
-    // Send session end message
+  public sendMetadata(metadata: Metadata) {
+    // we are going to send the whole metadata object if we didn't share one yet
+    // otherwise only include the keys that are different from the last reported metadata
+    let payload: Partial<Metadata>;
+
+    if (!this._lastReportedMetadata) {
+      payload = metadata;
+    } else {
+      payload = {};
+      // Find updated fields
+      for (const key in metadata) {
+        // @ts-ignore
+        if (this._lastReportedMetadata[key] !== metadata[key]) {
+          // @ts-ignore
+          payload[key] = metadata[key];
+        }
+      }
+      if (Object.keys(payload).length === 0) {
+        return;
+      }
+    }
+    this.sendMessage({
+      type: "metadata/update",
+      payload,
+    });
+    this._lastReportedMetadata = this._lastReportedMetadata
+      ? {
+          ...this._lastReportedMetadata,
+          ...payload,
+        }
+      : metadata;
+  }
+
+  public end() {
     const sessionEndMessage: SessionEndMessage = {
       type: "session/end",
       payload: {
         sessionId: this.sessionInfo.session_id,
       },
     };
-
+    // Send session end message to all active clients
+    // Avoid sendMessage as it can activate clients
     for (const clientId of this.sessionActive) {
       const client = this.clients.get(clientId);
       if (client && client.isReady()) {
@@ -37,7 +76,7 @@ export class ServerSession {
     this.onSessionEnd();
   }
 
-  writeAudioPacketHeader(
+  public writeAudioPacketHeader(
     data: DataView,
     timestamp: number,
     sampleCount: number,
@@ -47,13 +86,7 @@ export class ServerSession {
     data.setUint32(9, sampleCount, false); // Sample count (big-endian)
   }
 
-  // Broadcast a binary message to all clients
-  sendBinary(buffer: ArrayBuffer) {
-    if (!this.clients.size) {
-      this.logger.log("No active clients, skipping audio chunk");
-      return;
-    }
-
+  private *_readyClients() {
     for (const client of this.clients.values()) {
       if (!client.isReady()) {
         this.logger.log(`Client ${client.clientId} not ready, skipping`);
@@ -67,8 +100,26 @@ export class ServerSession {
           type: "session/start" as const,
           payload: this.sessionInfo,
         });
+        if (this._lastReportedMetadata) {
+          client.send({
+            type: "metadata/update" as const,
+            payload: this._lastReportedMetadata,
+          });
+        }
         this.sessionActive.add(client.clientId);
       }
+      yield client;
+    }
+  }
+
+  public sendMessage(message: ServerMessages) {
+    for (const client of this._readyClients()) {
+      client.send(message);
+    }
+  }
+
+  sendBinary(buffer: ArrayBuffer) {
+    for (const client of this._readyClients()) {
       client.sendBinary(buffer);
     }
   }

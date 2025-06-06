@@ -153,10 +153,11 @@ export class Player extends EventEmitter<Events> {
         break;
 
       case "session/end":
+        this.metadata = null;
         this.sessionInfo = null;
         this.logger.log("Session ended");
+        this.fire("metadata-update", null);
         this.fire("session-update", null);
-        this._sendPlayerTime();
         break;
 
       case "metadata/update":
@@ -164,6 +165,7 @@ export class Player extends EventEmitter<Events> {
           ? { ...this.metadata, ...message.payload }
           : (message.payload as Metadata);
         this.fire("metadata-update", this.metadata);
+        console.log("METADATA UPDATED", this.metadata);
         break;
 
       case "source/time":

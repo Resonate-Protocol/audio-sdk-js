@@ -48,8 +48,8 @@ Fired when the server information has been updated. Event data is the server inf
 
 ### `session-update`
 
-Fired when the session information has been updated. Event data is the session info.
+Fired when the session information has been updated. Event data is the session info or `null` if no session.
 
 ### `metadata-update`
 
-Fired when the metadata has been updated. Event data is the metadata.
+Fired when the metadata has been updated. Event data is the metadata or `null` if no metadata.
