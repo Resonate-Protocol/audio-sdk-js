@@ -26,7 +26,7 @@ export interface PlayerTimeInfo {
   player_transmitted: number;
 }
 
-export interface SourceTimeInfo {
+export interface ServerTimeInfo {
   player_transmitted: number;
   source_received: number;
   source_transmitted: number;
@@ -37,19 +37,19 @@ export interface PlayerTimeMessage {
   payload: PlayerTimeInfo;
 }
 
-export interface SourceInfo {
+export interface ServerInfo {
   source_id: string;
   name: string;
 }
 
-export interface SourceHelloMessage {
+export interface ServerHelloMessage {
   type: "source/hello";
-  payload: SourceInfo;
+  payload: ServerInfo;
 }
 
-export interface SourceTimeMessage {
+export interface ServerTimeMessage {
   type: "source/time";
-  payload: SourceTimeInfo;
+  payload: ServerTimeInfo;
 }
 
 export interface SessionStartMessage {
@@ -115,9 +115,9 @@ export type ClientMessages =
 export type ServerMessages =
   | SessionStartMessage
   | SessionEndMessage
-  | SourceHelloMessage
+  | ServerHelloMessage
   | MetadataUpdateMessage
-  | SourceTimeMessage;
+  | ServerTimeMessage;
 
 export enum BinaryMessageType {
   PlayAudioChunk = 1,

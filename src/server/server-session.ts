@@ -4,16 +4,16 @@ import {
   SessionEndMessage,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
-import { SourceClient } from "./source-client.js";
+import { ServerClient } from "./server-client.js";
 
 const HEADER_SIZE = 13;
 
-export class SourceSession {
+export class ServerSession {
   sessionActive: Set<string> = new Set();
 
   constructor(
     private readonly sessionInfo: SessionInfo,
-    private readonly clients: Map<string, SourceClient>,
+    private readonly clients: Map<string, ServerClient>,
     private readonly logger: Logger,
     private readonly onSessionEnd: () => void,
   ) {}

@@ -1,11 +1,11 @@
 import {
-  SourceInfo,
+  ServerInfo,
   SessionInfo,
   ServerMessages,
   BinaryMessageType,
   PlayerHelloMessage,
   Metadata,
-  SourceTimeInfo,
+  ServerTimeInfo,
   PlayerTimeMessage,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
@@ -14,7 +14,7 @@ import { EventEmitter } from "../util/event-emitter.js";
 type Events = {
   open: void;
   close: { expected: boolean };
-  "source-update": SourceInfo | null;
+  "server-update": ServerInfo | null;
   "session-update": SessionInfo | null;
   "metadata-update": Metadata | null;
 };
@@ -28,17 +28,19 @@ export interface PlayerOptions {
 // Use standard AudioContext or fallback to webkitAudioContext
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
+// Maximum number of samples to keep for time diff calculation
+const MAX_TIME_DIFF_SAMPLES = 50;
+
 export class Player extends EventEmitter<Events> {
   private options: PlayerOptions;
   private logger: Logger = console;
   private ws: WebSocket | null = null;
-  private sourceInfo: SourceInfo | null = null;
+  private serverInfo: ServerInfo | null = null;
   private sessionInfo: SessionInfo | null = null;
   private audioContext: AudioContext | null = null;
   private metadata: Metadata | null = null;
   private serverTimeDiff: number = 0; // Time difference between server and client
   private serverTimeDiffSamples: number[] = []; // Store last 50 samples for median
-  private readonly maxTimeDiffSamples = 50;
   private expectClose = true;
 
   constructor(options: PlayerOptions) {
@@ -61,6 +63,7 @@ export class Player extends EventEmitter<Events> {
     this.ws.onopen = () => {
       this.logger.log("WebSocket connected");
       this.audioContext = new AudioContextClass();
+      this.serverTimeDiffSamples = [];
       this.expectClose = false;
       this.sendHello();
       this.sendPlayerTime();
@@ -139,9 +142,9 @@ export class Player extends EventEmitter<Events> {
     this.logger.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
-        this.sourceInfo = message.payload;
-        this.logger.log("Source connected:", this.sourceInfo);
-        this.fire("source-update", this.sourceInfo);
+        this.serverInfo = message.payload;
+        this.logger.log("Server connected:", this.serverInfo);
+        this.fire("server-update", this.serverInfo);
 
         break;
       case "session/start":
@@ -156,6 +159,7 @@ export class Player extends EventEmitter<Events> {
         // Re-instate the audioContext or else the old buffer keeps playing.
         this.audioContext!.close();
         this.audioContext = new AudioContextClass();
+        this.serverTimeDiffSamples = [];
         // Sync player time with the server.
         this.sendPlayerTime();
         // Clear session information when session ends.
@@ -171,7 +175,7 @@ export class Player extends EventEmitter<Events> {
 
       case "source/time":
         // Pass player_received time to the handler
-        this.handleSourceTime(message.payload, receivedAt);
+        this.handleServerTime(message.payload, receivedAt);
         break;
 
       default:
@@ -323,7 +327,7 @@ export class Player extends EventEmitter<Events> {
     }
   }
 
-  handleSourceTime(payload: SourceTimeInfo, receivedAt: number) {
+  handleServerTime(payload: ServerTimeInfo, receivedAt: number) {
     const { player_transmitted, source_received, source_transmitted } = payload;
 
     // Calculate the raw offset from this message (in seconds)
@@ -336,8 +340,11 @@ export class Player extends EventEmitter<Events> {
 
     // Store the offset sample
     this.serverTimeDiffSamples.push(offset);
-    if (this.serverTimeDiffSamples.length > this.maxTimeDiffSamples) {
+    if (this.serverTimeDiffSamples.length > MAX_TIME_DIFF_SAMPLES) {
       this.serverTimeDiffSamples.shift();
+    } else if (this.serverTimeDiffSamples.length < 20) {
+      // let's kick off another sample
+      this.sendPlayerTime();
     }
 
     // Calculate the median of the samples for a stable offset
@@ -364,7 +371,7 @@ export class Player extends EventEmitter<Events> {
     this.expectClose = true;
     this.ws.close();
     this.ws = null;
-    this.sourceInfo = null;
+    this.serverInfo = null;
     this.sessionInfo = null;
 
     if (this.audioContext && this.audioContext.state !== "closed") {

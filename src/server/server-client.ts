@@ -11,13 +11,13 @@ import type { Logger } from "../logging.js";
 import { generateUniqueId } from "../util/unique-id.js";
 import { EventEmitter } from "../util/event-emitter.js";
 
-interface SourceClientEvents {
+interface ServerClientEvents {
   close: void;
   "player-state": PlayerState | null;
   "stream-command": StreamCommandMessage["payload"];
 }
 
-export class SourceClient extends EventEmitter<SourceClientEvents> {
+export class ServerClient extends EventEmitter<ServerClientEvents> {
   public clientId: string;
   public playerInfo: PlayerInfo | null = null;
   public playerState: PlayerState | null = null;

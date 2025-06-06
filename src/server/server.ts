@@ -1,19 +1,19 @@
-import { SourceClient } from "./source-client.js";
+import { ServerClient } from "./server-client.js";
 import { generateUniqueId } from "../util/unique-id.js";
-import { SourceSession } from "./source-session.js";
+import { ServerSession } from "./server-session.js";
 import type { Logger } from "../logging.js";
-import type { SourceInfo, SessionInfo } from "../messages.js";
+import type { ServerInfo, SessionInfo } from "../messages.js";
 
-export class Source {
-  private clients: Map<string, SourceClient> = new Map();
-  private session: SourceSession | null = null;
+export class Server {
+  private clients: Map<string, ServerClient> = new Map();
+  private session: ServerSession | null = null;
 
-  constructor(private sourceInfo: SourceInfo, private logger: Logger) {}
+  constructor(private serverInfo: ServerInfo, private logger: Logger) {}
 
-  addClient(client: SourceClient) {
+  addClient(client: ServerClient) {
     client.send({
       type: "source/hello" as const,
-      payload: this.getSourceInfo(),
+      payload: this.getServerInfo(),
     });
     this.clients.set(client.clientId, client);
 
@@ -37,7 +37,7 @@ export class Source {
   }
 
   // Get a copy of the current clients map
-  getClients(): Map<string, SourceClient> {
+  getClients(): Map<string, ServerClient> {
     return new Map(this.clients);
   }
 
@@ -46,8 +46,8 @@ export class Source {
     return this.clients.size;
   }
 
-  getSourceInfo(): SourceInfo {
-    return this.sourceInfo;
+  getServerInfo(): ServerInfo {
+    return this.serverInfo;
   }
 
   // Start an audio session
@@ -56,7 +56,7 @@ export class Source {
     sampleRate: number = 44100,
     channels: number = 2,
     bitDepth: number = 16,
-  ): SourceSession {
+  ): ServerSession {
     if (this.session) {
       throw new Error("Session already active");
     }
@@ -74,7 +74,7 @@ export class Source {
     };
 
     // Create new session with current clients
-    this.session = new SourceSession(
+    this.session = new ServerSession(
       sessionInfo,
       this.getClients(),
       this.logger,
@@ -89,7 +89,7 @@ export class Source {
   }
 
   // Get current session if exists
-  getSession(): SourceSession | null {
+  getSession(): ServerSession | null {
     return this.session;
   }
 

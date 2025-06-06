@@ -1,5 +1,5 @@
-import { SourceServer } from "./dist/server/source-server.js";
-import { Source } from "./dist/server/source.js";
+import { HTTPServer } from "./dist/server/http-server.js";
+import { Server } from "./dist/server/server.js";
 import { generateUniqueId } from "./dist/util/unique-id.js";
 import fs from "fs";
 import path from "path";
@@ -75,14 +75,14 @@ async function main() {
     const wavData = parseWavFile(WAV_FILE);
 
     // Create and start the Source server
-    const source = new Source(
+    const source = new Server(
       {
-        source_id: generateUniqueId("source"),
+        source_id: generateUniqueId("server"),
         name: "SDKSample",
       },
       logger,
     );
-    const server = new SourceServer(source, PORT, logger);
+    const server = new HTTPServer(source, PORT, logger);
     try {
       server.start();
     } catch (error) {
