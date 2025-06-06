@@ -199,7 +199,27 @@ export class ServerSession {
 
     this.sendBinary(buffer);
     this.logger.log(
-      `Broadcasted audio chunk: ${floatData[0].length} samples at timestamp ${timestamp}ms to ${this.clients.size} clients`,
+      `Broadcasted audio chunk: ${floatData[0].length} samples at timestamp ${timestamp}ms to ${this.sessionActive.size} clients`,
+    );
+  }
+
+  public sendMediaArt(format: string, data: Buffer<ArrayBufferLike>) {
+    // turn blob format jpeg = 0, png = 1
+    const mediaArtType = format.startsWith("image/jpeg")
+      ? 0
+      : format.startsWith("image/png")
+      ? 1
+      : -1;
+
+    if (mediaArtType === -1) {
+      throw new Error(`Unknown art format ${format}`);
+    }
+
+    const header = Buffer.from([BinaryMessageType.MediaArt, mediaArtType]);
+    const body = Buffer.from(data); // assumes `data` is something that can be wrapped as a Buffer
+    this.sendBinary(Buffer.concat([header, body]));
+    this.logger.log(
+      `Broadcasted media art of type ${mediaArtType} to ${this.sessionActive.size} clients`,
     );
   }
 

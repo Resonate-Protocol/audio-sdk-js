@@ -97,6 +97,14 @@
           <button class="clear-logs" id="clear-logs-btn">Clear Logs</button>
         </div>
         <div id="metadata" class="metadata"></div>
+        <div class="artwork">
+          <img
+            id="artwork-image"
+            src=""
+            alt="Artwork will appear here"
+            style="max-width: 100%; max-height: 200px; display: none"
+          />
+        </div>
       </div>
     </div>
 
@@ -111,6 +119,7 @@
       const connectionStatus = document.getElementById("connection-status");
       const clearLogsBtn = document.getElementById("clear-logs-btn");
       const metadata = document.getElementById("metadata");
+      const artworkImage = document.getElementById("artwork-image");
 
       playerIdInput.value = `player-${Math.floor(Math.random() * 1000)}`;
       urlInput.value = `ws://${window.location.hostname}:3001`;
@@ -205,15 +214,15 @@
       });
 
       // Player instance reference
-      let player = null;
+      let client = null;
       let reconnectTimeout = null;
 
       // Handle connect/disconnect button click
       connectButton.addEventListener("click", () => {
-        if (player) {
+        if (client) {
           // Disconnect if already connected
-          player.disconnect();
-          player = null;
+          client.disconnect();
+          client = null;
           connectButton.textContent = "Connect";
           connectionStatus.textContent = "Disconnected";
           if (reconnectTimeout) {
@@ -236,12 +245,12 @@
 
         try {
           // Create and connect the player with our custom logger
-          player = new Client({
+          client = new Client({
             playerId: playerIdInput.value,
             url,
             logger,
           });
-          player.on("metadata-update", (data) => {
+          client.on("metadata-update", (data) => {
             metadata.innerHTML = data
               ? `<strong>Metadata:</strong><br><pre>${JSON.stringify(
                   data,
@@ -251,20 +260,37 @@
               : "";
             logger.log("Received metadata:", data);
           });
-          player.on("close", (ev) => {
+          let previousArtworkUrl = null;
+          client.on("art-update", (data) => {
+            if (previousArtworkUrl) {
+              URL.revokeObjectURL(previousArtworkUrl);
+            }
+
+            if (data) {
+              artworkImage.src = previousArtworkUrl = URL.createObjectURL(
+                data.data,
+              );
+              artworkImage.style.display = "block";
+            } else {
+              previousArtworkUrl = null;
+              artworkImage.src = "";
+              artworkImage.style.display = "none";
+            }
+          });
+          client.on("close", (ev) => {
             if (!ev.expected) {
               logger.error("Connection closed unexpectedly");
-              reconnectTimeout = setTimeout(() => player.connect(true), 5000);
+              reconnectTimeout = setTimeout(() => client.connect(true), 5000);
               connectionStatus.textContent = "Reconnecting...";
               return;
             }
-            player = null;
+            client = null;
             connectButton.textContent = "Connect";
             connectionStatus.textContent = "Disconnected";
             metadata.innerHTML = "";
             logger.log("Disconnected from server");
           });
-          player.connect();
+          client.connect();
 
           // Update UI
           connectButton.textContent = "Disconnect";

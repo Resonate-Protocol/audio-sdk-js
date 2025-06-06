@@ -121,4 +121,5 @@ export type ServerMessages =
 
 export enum BinaryMessageType {
   PlayAudioChunk = 1,
+  MediaArt = 2,
 }

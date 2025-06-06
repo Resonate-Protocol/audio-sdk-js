@@ -11,6 +11,10 @@ const WAV_FILE = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "sample.wav",
 );
+const ART_FILE = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "927-square.png",
+);
 const REPLAY_INTERVAL = 10000; // Replay WAV file every 5 seconds
 
 const logger = {
@@ -72,6 +76,7 @@ async function main() {
   try {
     logger.log(`Reading WAV file: ${WAV_FILE}`);
     const wavData = parseWavFile(WAV_FILE);
+    const artData = fs.readFileSync(ART_FILE);
 
     // Create and start the Source server
     const musicServer = new MusicServer(
@@ -120,6 +125,7 @@ async function main() {
         repeat: "off",
         shuffle: false,
       });
+      session.sendMediaArt("image/png", artData);
       let start = performance.timeOrigin + performance.now() + 500;
       const timeSlice = 50; // ms
       const bytesPerSlice =

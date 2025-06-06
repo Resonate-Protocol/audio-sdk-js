@@ -17,6 +17,7 @@ type Events = {
   "server-update": ServerInfo | null;
   "session-update": SessionInfo | null;
   "metadata-update": Metadata | null;
+  "art-update": { data: Blob } | null;
 };
 
 export interface PlayerOptions {
@@ -157,6 +158,7 @@ export class Client extends EventEmitter<Events> {
         this.sessionInfo = null;
         this.logger.log("Session ended");
         this.fire("metadata-update", null);
+        this.fire("art-update", null);
         this.fire("session-update", null);
         break;
 
@@ -192,6 +194,9 @@ export class Client extends EventEmitter<Events> {
     switch (messageType) {
       case BinaryMessageType.PlayAudioChunk:
         this._handleAudioChunk(data);
+        break;
+      case BinaryMessageType.MediaArt:
+        this._handleArtUpdate(data);
         break;
       default:
         this.logger.error("Unknown binary message type:", messageType);
@@ -319,6 +324,33 @@ export class Client extends EventEmitter<Events> {
       );
       source.start(startTimeInAudioContext);
     }
+  }
+
+  private _handleArtUpdate(data: ArrayBuffer) {
+    // Create a DataView for accessing binary data
+    const dataView = new DataView(data);
+
+    // Bytes 2: image format
+    const formatByte = dataView.getUint8(1);
+    let format: string;
+    switch (formatByte) {
+      case 0: // JPEG
+        format = "jpeg";
+        break;
+      case 1: // PNG
+        format = "png";
+        break;
+      default:
+        this.logger.error("Unknown art format:", formatByte);
+        return;
+    }
+
+    // Header size in bytes
+    const headerSize = 2;
+
+    this.fire("art-update", {
+      data: new Blob([data.slice(headerSize)], { type: `image/${format}` }),
+    });
   }
 
   private _handleServerTime(payload: ServerTimeInfo, receivedAt: number) {
