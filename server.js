@@ -1,5 +1,5 @@
 import { HTTPServer } from "./dist/server/http-server.js";
-import { Server } from "./dist/server/server.js";
+import { MusicServer } from "./dist/server/music-server.js";
 import { generateUniqueId } from "./dist/util/unique-id.js";
 import fs from "fs";
 import path from "path";
@@ -74,14 +74,14 @@ async function main() {
     const wavData = parseWavFile(WAV_FILE);
 
     // Create and start the Source server
-    const server = new Server(
+    const musicServer = new MusicServer(
       {
         source_id: generateUniqueId("server"),
         name: "SDKSample",
       },
       logger,
     );
-    const httpServer = new HTTPServer(server, PORT, logger);
+    const httpServer = new HTTPServer(musicServer, PORT, logger);
     try {
       httpServer.start();
     } catch (error) {
@@ -93,7 +93,7 @@ async function main() {
 
     // If we're playing a test sound and a client connects,
     // add them to the session.
-    server.on("client-added", (client) => {
+    musicServer.on("client-added", (client) => {
       if (session) {
         session.addClient(client);
       }
@@ -103,7 +103,7 @@ async function main() {
     const playAudio = async () => {
       logger.log("");
       logger.log("Sending WAV audio data to connected clients");
-      session = server.startSession(
+      session = musicServer.startSession(
         "pcm",
         wavData.sampleRate,
         wavData.channels,

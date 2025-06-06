@@ -1,13 +1,13 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Logger } from "../logging.js";
-import { Server } from "./server.js";
+import { MusicServer } from "./music-server.js";
 import { ServerClient } from "./server-client.js";
 
 export class HTTPServer {
   private websocketServer: WebSocketServer | null = null;
 
   constructor(
-    private server: Server,
+    private server: MusicServer,
     public port: number,
     private logger: Logger = console,
   ) {}

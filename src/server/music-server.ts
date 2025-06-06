@@ -12,7 +12,7 @@ interface ServerEvents {
   "session-ended": { sessionId: string };
 }
 
-export class Server extends EventEmitter<ServerEvents> {
+export class MusicServer extends EventEmitter<ServerEvents> {
   private clients: Map<string, ServerClient> = new Map();
   private session: ServerSession | null = null;
 
