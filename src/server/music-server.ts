@@ -5,14 +5,14 @@ import type { Logger } from "../logging.js";
 import type { ServerInfo, SessionInfo } from "../messages.js";
 import { EventEmitter } from "../util/event-emitter.js";
 
-interface ServerEvents {
+interface MusicServerEvents {
   "client-added": ServerClient;
   "client-removed": { clientId: string };
   "session-started": ServerSession;
   "session-ended": { sessionId: string };
 }
 
-export class MusicServer extends EventEmitter<ServerEvents> {
+export class MusicServer extends EventEmitter<MusicServerEvents> {
   private clients: Map<string, ServerClient> = new Map();
   private session: ServerSession | null = null;
 
