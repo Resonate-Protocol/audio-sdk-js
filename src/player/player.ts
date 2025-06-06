@@ -55,6 +55,14 @@ export class Player extends EventEmitter<Events> {
   connect(isReconnect: boolean = false) {
     this.expectClose = !isReconnect;
     this.ws = new WebSocket(this.options.url);
+
+    // Reset audio output/syncing on new connection
+    if (!isReconnect) {
+      this.audioContext = new AudioContextClass();
+      this.serverTimeDiff = 0;
+      this.serverTimeDiffSamples = [];
+    }
+
     // Expect binary data as ArrayBuffer
     this.ws.binaryType = "arraybuffer";
 
@@ -62,7 +70,6 @@ export class Player extends EventEmitter<Events> {
 
     this.ws.onopen = () => {
       this.logger.log("WebSocket connected");
-      this.audioContext = new AudioContextClass();
       this.serverTimeDiffSamples = [];
       this.expectClose = false;
       this.sendHello();
@@ -97,6 +104,7 @@ export class Player extends EventEmitter<Events> {
     this.ws.onclose = () => {
       this.logger.log("WebSocket connection closed");
       clearTimeout(timeSyncInterval!);
+      this.sessionInfo = null;
       this.audioContext!.close();
       this.audioContext = null;
       this.fire("close", {
@@ -154,16 +162,10 @@ export class Player extends EventEmitter<Events> {
         break;
 
       case "session/end":
+        this.sessionInfo = null;
         this.logger.log("Session ended");
         this.fire("session-update", null);
-        // Re-instate the audioContext or else the old buffer keeps playing.
-        this.audioContext!.close();
-        this.audioContext = new AudioContextClass();
-        this.serverTimeDiffSamples = [];
-        // Sync player time with the server.
         this.sendPlayerTime();
-        // Clear session information when session ends.
-        this.sessionInfo = null;
         break;
 
       case "metadata/update":
@@ -372,12 +374,5 @@ export class Player extends EventEmitter<Events> {
     this.ws.close();
     this.ws = null;
     this.serverInfo = null;
-    this.sessionInfo = null;
-
-    if (this.audioContext && this.audioContext.state !== "closed") {
-      this.audioContext.close();
-    }
-
-    this.audioContext = null;
   }
 }
