@@ -14,6 +14,7 @@ export class ServerSession {
   sessionActive: Set<string> = new Set();
 
   private _lastReportedMetadata: Metadata | null = null;
+  private _lastReportedArt: Buffer<ArrayBuffer> | null = null;
 
   constructor(
     private readonly sessionInfo: SessionInfo,
@@ -78,6 +79,8 @@ export class ServerSession {
       }
     }
     this.sessionActive.clear();
+    this._lastReportedMetadata = null;
+    this._lastReportedArt = null;
     this.onSessionEnd();
   }
 
@@ -110,6 +113,9 @@ export class ServerSession {
             type: "metadata/update" as const,
             payload: this._lastReportedMetadata,
           });
+        }
+        if (this._lastReportedArt) {
+          client.sendBinary(this._lastReportedArt);
         }
         this.sessionActive.add(client.clientId);
       }
@@ -216,8 +222,10 @@ export class ServerSession {
     }
 
     const header = Buffer.from([BinaryMessageType.MediaArt, mediaArtType]);
-    const body = Buffer.from(data); // assumes `data` is something that can be wrapped as a Buffer
-    this.sendBinary(Buffer.concat([header, body]));
+    const body = Buffer.from(data);
+    const artMessage = Buffer.concat([header, body]);
+    this.sendBinary(artMessage);
+    this._lastReportedArt = artMessage;
     this.logger.log(
       `Broadcasted media art of type ${mediaArtType} to ${this.sessionActive.size} clients`,
     );

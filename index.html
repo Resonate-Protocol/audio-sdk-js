@@ -288,6 +288,8 @@
             connectButton.textContent = "Connect";
             connectionStatus.textContent = "Disconnected";
             metadata.innerHTML = "";
+            artworkImage.src = "";
+            artworkImage.style.display = "none";
             logger.log("Disconnected from server");
           });
           client.connect();

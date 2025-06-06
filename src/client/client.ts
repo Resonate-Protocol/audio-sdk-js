@@ -98,7 +98,9 @@ export class Client extends EventEmitter<Events> {
     this.ws.onclose = () => {
       this.logger.log("WebSocket connection closed");
       clearTimeout(timeSyncInterval!);
+
       this.sessionInfo = null;
+      this.metadata = null;
       this.fire("close", {
         expected: this.expectClose,
       });
