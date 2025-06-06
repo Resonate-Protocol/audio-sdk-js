@@ -1,5 +1,5 @@
-import { SourceServer } from "./dist/source/source-server.js";
-import { Source } from "./dist/source/source.js";
+import { SourceServer } from "./dist/server/source-server.js";
+import { Source } from "./dist/server/source.js";
 import { generateUniqueId } from "./dist/util/unique-id.js";
 import fs from "fs";
 import path from "path";
@@ -114,9 +114,10 @@ async function main() {
         );
         // Usually equal to timeSlice, but shorter for last chunk
         start += (chunk.length / bytesPerSlice) * timeSlice;
-        
+
         // Send the audio if it should start playing within 1000 ms
-        const sleepDuration = start - performance.timeOrigin - performance.now()-1000;
+        const sleepDuration =
+          start - performance.timeOrigin - performance.now() - 1000;
         if (sleepDuration > 0) {
           await sleep(sleepDuration);
         }
