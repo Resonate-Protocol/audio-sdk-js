@@ -101,7 +101,7 @@
     </div>
 
     <script type="module">
-      import { Player } from "./dist/player/player.js";
+      import { Client } from "./dist/client/client.js";
 
       // Get references to the existing HTML elements
       const playerIdInput = document.getElementById("player-id-input");
@@ -236,7 +236,7 @@
 
         try {
           // Create and connect the player with our custom logger
-          player = new Player({
+          player = new Client({
             playerId: playerIdInput.value,
             url,
             logger,

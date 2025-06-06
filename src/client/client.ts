@@ -31,7 +31,7 @@ const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 // Maximum number of samples to keep for time diff calculation
 const MAX_TIME_DIFF_SAMPLES = 50;
 
-export class Player extends EventEmitter<Events> {
+export class Client extends EventEmitter<Events> {
   private options: PlayerOptions;
   private logger: Logger = console;
   private ws: WebSocket | null = null;
