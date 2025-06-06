@@ -89,11 +89,21 @@ async function main() {
       process.exit(1);
     }
 
+    let session;
+
+    // If we're playing a test sound and a client connects,
+    // add them to the session.
+    server.on("client-added", (client) => {
+      if (session) {
+        session.addClient(client);
+      }
+    });
+
     // Start audio session and stream periodically
     const playAudio = async () => {
       logger.log("");
       logger.log("Sending WAV audio data to connected clients");
-      const session = server.startSession(
+      session = server.startSession(
         "pcm",
         wavData.sampleRate,
         wavData.channels,
@@ -155,6 +165,7 @@ async function main() {
           100,
       );
       session.end();
+      session = null;
 
       await sleep(REPLAY_INTERVAL);
       playAudio();

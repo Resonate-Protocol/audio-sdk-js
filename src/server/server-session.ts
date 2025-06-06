@@ -3,8 +3,6 @@ import {
   BinaryMessageType,
   SessionEndMessage,
   Metadata,
-  MetadataUpdateMessage,
-  ClientMessages,
   ServerMessages,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
@@ -23,6 +21,13 @@ export class ServerSession {
     private readonly logger: Logger,
     private readonly onSessionEnd: () => void,
   ) {}
+
+  public addClient(client: ServerClient) {
+    this.clients.set(client.clientId, client);
+    this.logger.log(
+      `Client ${client.clientId} added to session ${this.sessionInfo.session_id}`,
+    );
+  }
 
   public sendMetadata(metadata: Metadata) {
     // we are going to send the whole metadata object if we didn't share one yet

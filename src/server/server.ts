@@ -3,12 +3,22 @@ import { generateUniqueId } from "../util/unique-id.js";
 import { ServerSession } from "./server-session.js";
 import type { Logger } from "../logging.js";
 import type { ServerInfo, SessionInfo } from "../messages.js";
+import { EventEmitter } from "../util/event-emitter.js";
 
-export class Server {
+interface ServerEvents {
+  "client-added": ServerClient;
+  "client-removed": { clientId: string };
+  "session-started": ServerSession;
+  "session-ended": { sessionId: string };
+}
+
+export class Server extends EventEmitter<ServerEvents> {
   private clients: Map<string, ServerClient> = new Map();
   private session: ServerSession | null = null;
 
-  constructor(private serverInfo: ServerInfo, private logger: Logger) {}
+  constructor(private serverInfo: ServerInfo, private logger: Logger) {
+    super();
+  }
 
   addClient(client: ServerClient) {
     client.send({
@@ -28,12 +38,14 @@ export class Server {
     });
 
     this.logger.log(`Client added: ${client.clientId}`);
+    this.fire("client-added", client);
   }
 
   // Remove a player when they disconnect
   removeClient(clientId: string) {
     this.clients.delete(clientId);
     this.logger.log(`Removed client: ${clientId}`);
+    this.fire("client-removed", { clientId });
   }
 
   // Get a copy of the current clients map
@@ -80,11 +92,12 @@ export class Server {
       this.logger,
       () => {
         // This callback is called when the session ends itself
-        this.logger.log(`Session ${sessionInfo.session_id} ended`);
         this.session = null;
+        this.logger.log(`Session ${sessionInfo.session_id} ended`);
+        this.fire("session-ended", { sessionId: sessionInfo.session_id });
       },
     );
-
+    this.fire("session-started", this.session);
     return this.session;
   }
 
