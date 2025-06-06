@@ -365,6 +365,13 @@ export class Client extends EventEmitter<Events> {
     this.expectClose = true;
     this.ws.close();
     this.ws = null;
+
+    // Make sure any currently playing audio is stopping
+    this.audioContext.close();
+    this.audioContext = new AudioContextClass();
+    this.serverTimeDiff = 0;
+    this.serverTimeDiffSamples = [];
+
     this.serverInfo = null;
   }
 }
