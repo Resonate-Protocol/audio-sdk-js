@@ -28,8 +28,8 @@ export interface PlayerTimeInfo {
 
 export interface ServerTimeInfo {
   player_transmitted: number;
-  source_received: number;
-  source_transmitted: number;
+  server_received: number;
+  server_transmitted: number;
 }
 
 export interface PlayerTimeMessage {
@@ -38,17 +38,17 @@ export interface PlayerTimeMessage {
 }
 
 export interface ServerInfo {
-  source_id: string;
+  server_id: string;
   name: string;
 }
 
 export interface ServerHelloMessage {
-  type: "source/hello";
+  type: "server/hello";
   payload: ServerInfo;
 }
 
 export interface ServerTimeMessage {
-  type: "source/time";
+  type: "server/time";
   payload: ServerTimeInfo;
 }
 

@@ -81,7 +81,7 @@ async function main() {
     // Create and start the Source server
     const musicServer = new MusicServer(
       {
-        source_id: generateUniqueId("server"),
+        server_id: generateUniqueId("server"),
         name: "SDKSample",
       },
       logger,
