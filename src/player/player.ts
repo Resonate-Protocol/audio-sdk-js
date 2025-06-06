@@ -37,7 +37,7 @@ export class Player extends EventEmitter<Events> {
   private ws: WebSocket | null = null;
   private serverInfo: ServerInfo | null = null;
   private sessionInfo: SessionInfo | null = null;
-  private audioContext: AudioContext | null = null;
+  private audioContext = new AudioContextClass();
   private metadata: Metadata | null = null;
   private serverTimeDiff: number = 0; // Time difference between server and client
   private serverTimeDiffSamples: number[] = []; // Store last 50 samples for median
@@ -52,16 +52,9 @@ export class Player extends EventEmitter<Events> {
   }
 
   // Establish a WebSocket connection
-  connect(isReconnect: boolean = false) {
+  public connect(isReconnect: boolean = false) {
     this.expectClose = !isReconnect;
     this.ws = new WebSocket(this.options.url);
-
-    // Reset audio output/syncing on new connection
-    if (!isReconnect) {
-      this.audioContext = new AudioContextClass();
-      this.serverTimeDiff = 0;
-      this.serverTimeDiffSamples = [];
-    }
 
     // Expect binary data as ArrayBuffer
     this.ws.binaryType = "arraybuffer";
@@ -72,10 +65,10 @@ export class Player extends EventEmitter<Events> {
       this.logger.log("WebSocket connected");
       this.serverTimeDiffSamples = [];
       this.expectClose = false;
-      this.sendHello();
-      this.sendPlayerTime();
+      this._sendHello();
+      this._sendPlayerTime();
       timeSyncInterval = window.setInterval(() => {
-        this.sendPlayerTime();
+        this._sendPlayerTime();
       }, 5000);
       this.fire("open");
     };
@@ -85,7 +78,7 @@ export class Player extends EventEmitter<Events> {
       if (typeof event.data === "string") {
         try {
           const message = JSON.parse(event.data);
-          this.handleTextMessage(
+          this._handleTextMessage(
             message,
             this.audioContext!.currentTime * 1000000,
           );
@@ -93,7 +86,7 @@ export class Player extends EventEmitter<Events> {
           this.logger.error("Error parsing message", err);
         }
       } else {
-        this.handleBinaryMessage(event.data);
+        this._handleBinaryMessage(event.data);
       }
     };
 
@@ -105,8 +98,6 @@ export class Player extends EventEmitter<Events> {
       this.logger.log("WebSocket connection closed");
       clearTimeout(timeSyncInterval!);
       this.sessionInfo = null;
-      this.audioContext!.close();
-      this.audioContext = null;
       this.fire("close", {
         expected: this.expectClose,
       });
@@ -114,7 +105,7 @@ export class Player extends EventEmitter<Events> {
   }
 
   // Send a hello message to the server with player details.
-  sendHello() {
+  private _sendHello() {
     const helloMsg: PlayerHelloMessage = {
       type: "player/hello",
       payload: {
@@ -134,7 +125,7 @@ export class Player extends EventEmitter<Events> {
     this.ws!.send(JSON.stringify(helloMsg));
   }
 
-  sendPlayerTime() {
+  private _sendPlayerTime() {
     const timeMsg: PlayerTimeMessage = {
       type: "player/time",
       payload: {
@@ -146,7 +137,7 @@ export class Player extends EventEmitter<Events> {
   }
 
   // Handle text (JSON) messages from the server.
-  handleTextMessage(message: ServerMessages, receivedAt: number) {
+  private _handleTextMessage(message: ServerMessages, receivedAt: number) {
     this.logger.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
@@ -165,7 +156,7 @@ export class Player extends EventEmitter<Events> {
         this.sessionInfo = null;
         this.logger.log("Session ended");
         this.fire("session-update", null);
-        this.sendPlayerTime();
+        this._sendPlayerTime();
         break;
 
       case "metadata/update":
@@ -177,7 +168,7 @@ export class Player extends EventEmitter<Events> {
 
       case "source/time":
         // Pass player_received time to the handler
-        this.handleServerTime(message.payload, receivedAt);
+        this._handleServerTime(message.payload, receivedAt);
         break;
 
       default:
@@ -187,7 +178,7 @@ export class Player extends EventEmitter<Events> {
   }
 
   // Handle binary messages – here we assume binary messages are audio chunks.
-  handleBinaryMessage(data: ArrayBuffer) {
+  private _handleBinaryMessage(data: ArrayBuffer) {
     // Create a DataView for accessing binary data
     const dataView = new DataView(data);
 
@@ -198,7 +189,7 @@ export class Player extends EventEmitter<Events> {
 
     switch (messageType) {
       case BinaryMessageType.PlayAudioChunk:
-        this.handleAudioChunk(data);
+        this._handleAudioChunk(data);
         break;
       default:
         this.logger.error("Unknown binary message type:", messageType);
@@ -206,7 +197,7 @@ export class Player extends EventEmitter<Events> {
   }
 
   // Handle an audio chunk binary message.
-  handleAudioChunk(data: ArrayBuffer) {
+  private _handleAudioChunk(data: ArrayBuffer) {
     // Check if AudioContext is available
     if (!this.audioContext) {
       this.logger.error("Cannot play audio: AudioContext not initialized");
@@ -328,7 +319,7 @@ export class Player extends EventEmitter<Events> {
     }
   }
 
-  handleServerTime(payload: ServerTimeInfo, receivedAt: number) {
+  private _handleServerTime(payload: ServerTimeInfo, receivedAt: number) {
     const { player_transmitted, source_received, source_transmitted } = payload;
 
     // Calculate the raw offset from this message (in seconds)
@@ -345,7 +336,7 @@ export class Player extends EventEmitter<Events> {
       this.serverTimeDiffSamples.shift();
     } else if (this.serverTimeDiffSamples.length < 20) {
       // let's kick off another sample
-      this.sendPlayerTime();
+      this._sendPlayerTime();
     }
 
     // Calculate the median of the samples for a stable offset
@@ -365,7 +356,7 @@ export class Player extends EventEmitter<Events> {
   }
 
   // Close the WebSocket connection and clean up resources.
-  disconnect() {
+  public disconnect() {
     if (!this.ws) {
       return;
     }
