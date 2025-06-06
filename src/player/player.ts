@@ -297,7 +297,6 @@ export class Player extends EventEmitter<Events> {
       }
     }
 
-    // Create a buffer source node, connect it, and start playback.
     const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(this.audioContext.destination);

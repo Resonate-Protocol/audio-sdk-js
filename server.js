@@ -13,7 +13,6 @@ const WAV_FILE = path.join(
 );
 const REPLAY_INTERVAL = 10000; // Replay WAV file every 5 seconds
 
-// Create a simple logger that mirrors the Logger interface from source.ts
 const logger = {
   log: (...args) =>
     args[0] ? console.log(new Date().toISOString(), ...args) : console.log(""),
@@ -75,18 +74,18 @@ async function main() {
     const wavData = parseWavFile(WAV_FILE);
 
     // Create and start the Source server
-    const source = new Server(
+    const server = new Server(
       {
         source_id: generateUniqueId("server"),
         name: "SDKSample",
       },
       logger,
     );
-    const server = new HTTPServer(source, PORT, logger);
+    const httpServer = new HTTPServer(server, PORT, logger);
     try {
-      server.start();
+      httpServer.start();
     } catch (error) {
-      logger.error("Failed to start source server", error);
+      logger.error("Failed to start server", error);
       process.exit(1);
     }
 
@@ -94,7 +93,7 @@ async function main() {
     const playAudio = async () => {
       logger.log("");
       logger.log("Sending WAV audio data to connected clients");
-      const session = source.startSession(
+      const session = server.startSession(
         "pcm",
         wavData.sampleRate,
         wavData.channels,
@@ -141,7 +140,7 @@ async function main() {
     // Handle process termination
     process.on("SIGINT", () => {
       logger.log("Shutting down server...");
-      server.stop();
+      httpServer.stop();
       process.exit(0);
     });
   } catch (error) {
