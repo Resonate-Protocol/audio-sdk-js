@@ -29,6 +29,8 @@ export interface PlayerOptions {
 // Use standard AudioContext or fallback to webkitAudioContext
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
+const MIN_TIME_DIFF_SAMPLES = 20; // Minimum number of samples we want to have
+
 // Maximum number of samples to keep for time diff calculation
 const MAX_TIME_DIFF_SAMPLES = 50;
 
@@ -70,7 +72,7 @@ export class Client extends EventEmitter<Events> {
       this._sendPlayerTime();
       timeSyncInterval = window.setInterval(() => {
         this._sendPlayerTime();
-      }, 5000);
+      }, 1000);
       this.fire("open");
     };
 
@@ -370,9 +372,9 @@ export class Client extends EventEmitter<Events> {
     this.serverTimeDiffSamples.push(offset);
     if (this.serverTimeDiffSamples.length > MAX_TIME_DIFF_SAMPLES) {
       this.serverTimeDiffSamples.shift();
-    } else if (this.serverTimeDiffSamples.length < 20) {
-      // let's kick off another sample
-      this._sendPlayerTime();
+    } else if (this.serverTimeDiffSamples.length < MIN_TIME_DIFF_SAMPLES) {
+      // let's kick off another sample in 10ms
+      setTimeout(() => this._sendPlayerTime(), 10);
     }
 
     // Calculate the median of the samples for a stable offset
