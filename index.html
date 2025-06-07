@@ -93,7 +93,10 @@
         <button id="connect-button">Connect</button>
         <div class="status-container">
           <div id="connection-status">Disconnected</div>
+          <div id="available-groups"></div>
           <div id="status-display" class="status"></div>
+          <button id="join-group-btn">Join Group</button>
+          <button id="leave-group-btn">Leave Group</button>
           <button class="clear-logs" id="clear-logs-btn">Clear Logs</button>
         </div>
         <div id="metadata" class="metadata"></div>
@@ -115,6 +118,9 @@
       const playerIdInput = document.getElementById("player-id-input");
       const urlInput = document.getElementById("url-input");
       const connectButton = document.getElementById("connect-button");
+      const availableGroups = document.getElementById("available-groups");
+      const joinGroupButton = document.getElementById("join-group-btn");
+      const leaveGroupButton = document.getElementById("leave-group-btn");
       const statusDisplay = document.getElementById("status-display");
       const connectionStatus = document.getElementById("connection-status");
       const clearLogsBtn = document.getElementById("clear-logs-btn");
@@ -218,7 +224,7 @@
       let reconnectTimeout = null;
 
       // Handle connect/disconnect button click
-      connectButton.addEventListener("click", () => {
+      connectButton.addEventListener("click", async () => {
         if (client) {
           // Disconnect if already connected
           client.disconnect();
@@ -292,16 +298,31 @@
             artworkImage.style.display = "none";
             logger.log("Disconnected from server");
           });
-          client.connect();
 
           // Update UI
           connectButton.textContent = "Disconnect";
           connectionStatus.textContent = `Connected to ${url}`;
           logger.log(`Attempting connection to ${url}`);
+          await client.connect();
         } catch (error) {
           connectionStatus.textContent = `Error: ${error}`;
           logger.error("Connection error:", error);
         }
+
+        const groups = await client.getServerGroups();
+
+        joinGroupButton.addEventListener("click", async () => {
+          client.joinGroup(groups[0].groupId);
+          logger.log(`Joined group: ${groups[0].groupId}`);
+        });
+        leaveGroupButton.addEventListener("click", async () => {
+          client.unjoinGroup();
+          logger.log("Left group");
+        });
+
+        availableGroups.innerHTML = `<strong>Available Server Groups:</strong>${groups
+          .map((group) => `<code>${group.groupId}</code>`)
+          .join(", ")}`;
       });
     </script>
   </body>

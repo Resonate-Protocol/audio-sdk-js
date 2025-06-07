@@ -15,6 +15,7 @@ interface ServerGroupEvents {
 export class ServerGroup extends EventEmitter<ServerGroupEvents> {
   public clients: Map<string, ServerClient> = new Map();
   public activeSession: ServerSession | null = null;
+  public groupId = generateUniqueId("group");
 
   constructor(private readonly logger: Logger) {
     super();
@@ -26,7 +27,7 @@ export class ServerGroup extends EventEmitter<ServerGroupEvents> {
 
   public addClient(client: ServerClient) {
     this.clients.set(client.clientId, client);
-    this.logger.log(`Client ${client.clientId} added to group`);
+    this.logger.log(`Client ${client.clientId} added to group ${this.groupId}`);
     this.fire("client-added", client);
   }
 

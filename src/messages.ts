@@ -106,18 +106,47 @@ export interface PlayerStateMessage {
   payload: PlayerState;
 }
 
+export interface GroupJoinMessage {
+  type: "group/join";
+  payload: {
+    groupId: string;
+  };
+}
+
+export interface GroupUnjoinMessage {
+  type: "group/unjoin";
+}
+
+export interface GroupGetListMessage {
+  type: "group/get-list";
+}
+
+export interface GroupListMessage {
+  type: "group/list";
+  payload: {
+    groups: Array<{
+      groupId: string;
+      state: "idle" | "playing" | "paused";
+    }>;
+  };
+}
+
 export type ClientMessages =
   | PlayerHelloMessage
   | StreamCommandMessage
   | PlayerStateMessage
-  | PlayerTimeMessage;
+  | PlayerTimeMessage
+  | GroupJoinMessage
+  | GroupUnjoinMessage
+  | GroupGetListMessage;
 
 export type ServerMessages =
   | SessionStartMessage
   | SessionEndMessage
   | ServerHelloMessage
   | MetadataUpdateMessage
-  | ServerTimeMessage;
+  | ServerTimeMessage
+  | GroupListMessage;
 
 export enum BinaryMessageType {
   PlayAudioChunk = 1,

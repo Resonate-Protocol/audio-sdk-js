@@ -1,7 +1,6 @@
 import { WebSocket } from "ws";
 import type {
   PlayerInfo,
-  PlayerTimeInfo,
   ServerMessages,
   ClientMessages,
   PlayerState,
@@ -16,6 +15,14 @@ interface ServerClientEvents {
   close: void;
   "player-state": PlayerState | null;
   "stream-command": StreamCommandMessage["payload"];
+  "group-command":
+    | {
+        command: "unjoin" | "list";
+      }
+    | {
+        command: "join";
+        groupId: string;
+      };
 }
 
 export class ServerClient extends EventEmitter<ServerClientEvents> {
@@ -79,6 +86,25 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
         this.fire("stream-command", message.payload);
         break;
 
+      case "group/join":
+        this.fire("group-command", {
+          command: "join",
+          groupId: message.payload.groupId,
+        });
+        break;
+
+      case "group/unjoin":
+        this.fire("group-command", {
+          command: "unjoin",
+        });
+        break;
+
+      case "group/get-list":
+        this.fire("group-command", {
+          command: "list",
+        });
+        break;
+
       case "player/state":
         this.playerState = message.payload;
         this.fire("player-state", message.payload);
@@ -108,11 +134,15 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
 
   public async accept(serverInfo: ServerInfo) {
     await new Promise((resolve) => {
-      this._playerInfoReceived = resolve;
       this.send({
         type: "source/hello" as const,
         payload: serverInfo,
       });
+      if (this.playerInfo) {
+        resolve(this.playerInfo);
+      } else {
+        this._playerInfoReceived = resolve;
+      }
     });
   }
 

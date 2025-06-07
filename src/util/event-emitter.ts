@@ -11,6 +11,14 @@ export class EventEmitter<E extends Record<string, any>> {
     return this;
   }
 
+  once<K extends keyof E>(event: K, listener: (data: E[K]) => unknown): this {
+    const onceListener = (data: E[K]) => {
+      listener(data);
+      this.off(event, onceListener);
+    };
+    return this.on(event, onceListener);
+  }
+
   off<K extends keyof E>(event: K, listener: (data: E[K]) => unknown): this {
     if (this._listeners[event]) {
       this._listeners[event] = this._listeners[event]!.filter(

@@ -7,6 +7,8 @@ import {
   Metadata,
   ServerTimeInfo,
   PlayerTimeMessage,
+  GroupListMessage,
+  ClientMessages,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
 import { EventEmitter } from "../util/event-emitter.js";
@@ -18,6 +20,7 @@ type Events = {
   "session-update": SessionInfo | null;
   "metadata-update": Metadata | null;
   "art-update": { data: Blob } | null;
+  "groups-update": { groups: GroupListMessage["payload"]["groups"] };
 };
 
 export interface PlayerOptions {
@@ -55,7 +58,21 @@ export class Client extends EventEmitter<Events> {
   }
 
   // Establish a WebSocket connection
-  public connect(isReconnect: boolean = false) {
+  public async connect(isReconnect: boolean = false) {
+    const connected = new Promise((resolve, reject) => {
+      this.once("open", () => {
+        this.logger.log("WebSocket connection established");
+        resolve(true);
+      });
+      this.once("close", (data) => {
+        this.logger.log("WebSocket connection closed", data);
+        if (data.expected) {
+          resolve(false);
+        } else {
+          reject(new Error("WebSocket connection closed unexpectedly"));
+        }
+      });
+    });
     this.expectClose = !isReconnect;
     this.ws = new WebSocket(this.options.url);
 
@@ -64,7 +81,7 @@ export class Client extends EventEmitter<Events> {
 
     let timeSyncInterval: number | null = null;
 
-    this.ws.onopen = () => {
+    this.ws.addEventListener("open", () => {
       this.logger.log("WebSocket connected");
       this.serverTimeDiffSamples = [];
       this.expectClose = false;
@@ -74,9 +91,9 @@ export class Client extends EventEmitter<Events> {
         this._sendPlayerTime();
       }, 1000);
       this.fire("open");
-    };
+    });
 
-    this.ws.onmessage = (event) => {
+    this.ws.addEventListener("message", (event) => {
       // Check if the message is text (JSON) or binary (ArrayBuffer)
       if (typeof event.data === "string") {
         try {
@@ -91,14 +108,13 @@ export class Client extends EventEmitter<Events> {
       } else {
         this._handleBinaryMessage(event.data);
       }
-    };
+    });
 
-    this.ws.onerror = (error) => {
+    this.ws.addEventListener("error", (error) => {
       this.logger.error("WebSocket error:", error);
-    };
+    });
 
-    this.ws.onclose = () => {
-      this.logger.log("WebSocket connection closed");
+    this.ws.addEventListener("close", () => {
       clearTimeout(timeSyncInterval!);
 
       this.sessionInfo = null;
@@ -106,12 +122,13 @@ export class Client extends EventEmitter<Events> {
       this.fire("close", {
         expected: this.expectClose,
       });
-    };
+    });
+    return connected;
   }
 
   // Send a hello message to the server with player details.
   private _sendHello() {
-    const helloMsg: PlayerHelloMessage = {
+    this.send({
       type: "player/hello",
       payload: {
         player_id: this.options.playerId,
@@ -126,19 +143,24 @@ export class Client extends EventEmitter<Events> {
         media_display_size: null,
         buffer_capacity: 10000000000,
       },
-    };
-    this.ws!.send(JSON.stringify(helloMsg));
+    });
   }
 
   private _sendPlayerTime() {
-    const timeMsg: PlayerTimeMessage = {
+    this.send({
       type: "player/time",
       payload: {
         player_transmitted: this.audioContext!.currentTime * 1000000,
       },
-    };
-    this.ws!.send(JSON.stringify(timeMsg));
-    this.logger.log("Sent player/time:", timeMsg.payload.player_transmitted);
+    });
+  }
+
+  public send(message: ClientMessages) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket is not connected");
+    }
+    this.ws.send(JSON.stringify(message));
+    this.logger.log("Sent message:", message);
   }
 
   // Handle text (JSON) messages from the server.
@@ -146,8 +168,8 @@ export class Client extends EventEmitter<Events> {
     this.logger.log("Received text message:", message);
     switch (message.type) {
       case "source/hello":
-        this.serverInfo = message.payload;
         this.logger.log("Server connected:", this.serverInfo);
+        this.serverInfo = message.payload;
         this.fire("server-update", this.serverInfo);
 
         break;
@@ -158,25 +180,31 @@ export class Client extends EventEmitter<Events> {
         break;
 
       case "session/end":
+        this.logger.log("Session ended");
         this.metadata = null;
         this.sessionInfo = null;
-        this.logger.log("Session ended");
         this.fire("metadata-update", null);
         this.fire("art-update", null);
         this.fire("session-update", null);
         break;
 
       case "metadata/update":
+        console.log("Metadata updated", this.metadata);
         this.metadata = this.metadata
           ? { ...this.metadata, ...message.payload }
           : (message.payload as Metadata);
         this.fire("metadata-update", this.metadata);
-        console.log("METADATA UPDATED", this.metadata);
         break;
 
       case "source/time":
-        // Pass player_received time to the handler
         this._handleServerTime(message.payload, receivedAt);
+        break;
+
+      case "group/list":
+        this.logger.log("Received group list", message.payload);
+        this.fire("groups-update", {
+          groups: message.payload.groups,
+        });
         break;
 
       default:
@@ -393,6 +421,44 @@ export class Client extends EventEmitter<Events> {
     );
   }
 
+  public joinGroup(groupId: string) {
+    this.send({
+      type: "group/join",
+      payload: {
+        groupId,
+      },
+    });
+  }
+
+  public unjoinGroup() {
+    // Make sure any currently playing audio is stopping
+    this._resetAudioContext();
+    this.send({
+      type: "group/unjoin",
+    });
+  }
+
+  public async getServerGroups(): Promise<
+    GroupListMessage["payload"]["groups"]
+  > {
+    return await new Promise((resolve) => {
+      this.once("groups-update", (data) => {
+        resolve(data.groups);
+      });
+      this.send({
+        type: "group/get-list",
+      });
+    });
+  }
+
+  private _resetAudioContext() {
+    // Make sure any currently playing audio is stopping
+    this.audioContext.close();
+    this.audioContext = new AudioContextClass();
+    this.serverTimeDiff = 0;
+    this.serverTimeDiffSamples = [];
+  }
+
   // Close the WebSocket connection and clean up resources.
   public disconnect() {
     if (!this.ws) {
@@ -403,10 +469,7 @@ export class Client extends EventEmitter<Events> {
     this.ws = null;
 
     // Make sure any currently playing audio is stopping
-    this.audioContext.close();
-    this.audioContext = new AudioContextClass();
-    this.serverTimeDiff = 0;
-    this.serverTimeDiffSamples = [];
+    this._resetAudioContext();
 
     this.serverInfo = null;
   }
