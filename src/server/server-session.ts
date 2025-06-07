@@ -20,6 +20,7 @@ export class ServerSession {
     private readonly sessionInfo: SessionInfo,
     private readonly clients: Map<string, ServerClient>,
     private readonly logger: Logger,
+    // This should become an event emitter that fires 'session-end'
     private readonly onSessionEnd: () => void,
   ) {}
 
