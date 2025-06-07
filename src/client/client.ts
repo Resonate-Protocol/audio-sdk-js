@@ -389,7 +389,7 @@ export class Client extends EventEmitter<Events> {
     this.serverTimeDiff = median;
 
     this.logger.log(
-      `Server time difference (median of ${sorted.length}): ${this.serverTimeDiff} s`,
+      `Server time difference (${sorted.length} samples): ${this.serverTimeDiff} s`,
     );
   }
 
