@@ -24,6 +24,7 @@ export class MusicServer extends EventEmitter<MusicServerEvents> {
       type: "source/hello" as const,
       payload: this.serverInfo,
     });
+    // TODO only do next steps if client gives proper response.
     this.clients.set(client.clientId, client);
 
     client.on("close", () => {
@@ -35,6 +36,9 @@ export class MusicServer extends EventEmitter<MusicServerEvents> {
       }
       this.fire("client-removed", client);
     });
+
+    // TODO listen to group-join, group-leave commands
+
     this.fire("client-added", client);
   }
 
