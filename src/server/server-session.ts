@@ -6,32 +6,32 @@ import {
   ServerMessages,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
+import { ServerGroup } from "./server-group.js";
+import { EventEmitter } from "../util/event-emitter.js";
 import { ServerClient } from "./server-client.js";
 
 const HEADER_SIZE = 13;
 
-export class ServerSession {
+interface ServerSessionEvents {
+  "session-end": ServerSession;
+}
+
+export class ServerSession extends EventEmitter<ServerSessionEvents> {
   sessionActive: Set<string> = new Set();
 
   private _lastReportedMetadata: Metadata | null = null;
   private _lastReportedArt: Buffer<ArrayBuffer> | null = null;
 
   constructor(
+    private readonly group: ServerGroup,
     private readonly sessionInfo: SessionInfo,
-    private readonly clients: Map<string, ServerClient>,
     private readonly logger: Logger,
-    // This should become an event emitter that fires 'session-end'
-    private readonly onSessionEnd: () => void,
-  ) {}
-
-  // TODO we should extract a ServerGroup class that handles group member actions
-  // like join, unjoin etc.
-  public addClient(client: ServerClient) {
-    this.clients.set(client.clientId, client);
-    // TODO update metadata on all clients with group members
-    this.logger.log(
-      `Client ${client.clientId} added to session ${this.sessionInfo.session_id}`,
-    );
+  ) {
+    super();
+    this.group.on("client-removed", this._clientRemoved);
+    this.on("session-end", () => {
+      this.group.off("client-removed", this._clientRemoved);
+    });
   }
 
   public sendMetadata(metadata: Metadata) {
@@ -78,7 +78,7 @@ export class ServerSession {
     // Send session end message to all active clients
     // Avoid sendMessage as it can activate clients
     for (const clientId of this.sessionActive) {
-      const client = this.clients.get(clientId);
+      const client = this.group.clients.get(clientId);
       if (client && client.isReady()) {
         client.send(sessionEndMessage);
       }
@@ -86,7 +86,7 @@ export class ServerSession {
     this.sessionActive.clear();
     this._lastReportedMetadata = null;
     this._lastReportedArt = null;
-    this.onSessionEnd();
+    this.fire("session-end", this);
   }
 
   public writeAudioPacketHeader(
@@ -100,7 +100,7 @@ export class ServerSession {
   }
 
   private *_readyClients() {
-    for (const client of this.clients.values()) {
+    for (const client of this.group.clients.values()) {
       if (!client.isReady()) {
         this.logger.log(`Client ${client.clientId} not ready, skipping`);
         if (this.sessionActive.has(client.clientId)) {
@@ -108,22 +108,24 @@ export class ServerSession {
         }
         continue;
       }
-      if (!this.sessionActive.has(client.clientId)) {
-        client.send({
-          type: "session/start" as const,
-          payload: this.sessionInfo,
-        });
-        if (this._lastReportedMetadata) {
-          client.send({
-            type: "metadata/update" as const,
-            payload: this._lastReportedMetadata,
-          });
-        }
-        if (this._lastReportedArt) {
-          client.sendBinary(this._lastReportedArt);
-        }
-        this.sessionActive.add(client.clientId);
+      if (this.sessionActive.has(client.clientId)) {
+        yield client;
+        continue;
       }
+      client.send({
+        type: "session/start" as const,
+        payload: this.sessionInfo,
+      });
+      if (this._lastReportedMetadata) {
+        client.send({
+          type: "metadata/update" as const,
+          payload: this._lastReportedMetadata,
+        });
+      }
+      if (this._lastReportedArt) {
+        client.sendBinary(this._lastReportedArt);
+      }
+      this.sessionActive.add(client.clientId);
       yield client;
     }
   }
@@ -145,11 +147,6 @@ export class ServerSession {
     pcmData: Int16Array | Float32Array,
     timestamp: number = Date.now(),
   ) {
-    if (!this.clients.size) {
-      this.logger.log("No active clients, skipping audio chunk");
-      return;
-    }
-
     // Convert to Float32Array format if it's Int16Array
     let floatData: Float32Array[];
 
@@ -232,11 +229,19 @@ export class ServerSession {
     this.sendBinary(artMessage);
     this._lastReportedArt = artMessage;
     this.logger.log(
-      `Broadcasted media art of type ${mediaArtType} to ${this.sessionActive.size} clients`,
+      `Broadcasted media art (${format}) to ${this.sessionActive.size} clients`,
     );
   }
 
-  getInfo(): SessionInfo {
-    return this.sessionInfo;
-  }
+  private _clientRemoved = (client: ServerClient) => {
+    if (this.sessionActive.has(client.clientId) && client.isReady()) {
+      client.send({
+        type: "session/end" as const,
+        payload: {
+          sessionId: this.sessionInfo.session_id,
+        },
+      });
+      this.sessionActive.delete(client.clientId);
+    }
+  };
 }

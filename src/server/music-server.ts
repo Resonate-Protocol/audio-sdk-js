@@ -4,17 +4,16 @@ import { ServerSession } from "./server-session.js";
 import type { Logger } from "../logging.js";
 import type { ServerInfo, SessionInfo } from "../messages.js";
 import { EventEmitter } from "../util/event-emitter.js";
+import { ServerGroup } from "./server-group.js";
 
 interface MusicServerEvents {
   "client-added": ServerClient;
-  "client-removed": { clientId: string };
-  "session-started": ServerSession;
-  "session-ended": { sessionId: string };
+  "client-removed": ServerClient;
 }
 
 export class MusicServer extends EventEmitter<MusicServerEvents> {
   private clients: Map<string, ServerClient> = new Map();
-  private session: ServerSession | null = null;
+  private groups: Array<ServerGroup> = [];
 
   constructor(private serverInfo: ServerInfo, private logger: Logger) {
     super();
@@ -23,12 +22,18 @@ export class MusicServer extends EventEmitter<MusicServerEvents> {
   addClient(client: ServerClient) {
     client.send({
       type: "source/hello" as const,
-      payload: this.getServerInfo(),
+      payload: this.serverInfo,
     });
     this.clients.set(client.clientId, client);
 
     client.on("close", () => {
-      this.removeClient(client.clientId);
+      this.clients.delete(client.clientId);
+      for (const group of this.groups) {
+        if (group.clients.has(client.clientId)) {
+          group.removeClient(client.clientId);
+        }
+      }
+      this.fire("client-removed", client);
     });
     // TODO handle this in server-session.ts. How to handle player state updates?
     client.on("player-state", (state) => {
@@ -43,72 +48,17 @@ export class MusicServer extends EventEmitter<MusicServerEvents> {
     this.fire("client-added", client);
   }
 
-  // Remove a player when they disconnect
-  removeClient(clientId: string) {
-    this.clients.delete(clientId);
-    this.logger.log(`Removed client: ${clientId}`);
-    this.fire("client-removed", { clientId });
+  public createGroup(): ServerGroup {
+    const group = new ServerGroup(this.logger);
+    this.groups.push(group);
+    return group;
   }
 
-  // Get a copy of the current clients map
-  getClients(): Map<string, ServerClient> {
-    return new Map(this.clients);
-  }
-
-  // Get number of connected clients
-  count(): number {
-    return this.clients.size;
-  }
-
-  getServerInfo(): ServerInfo {
-    return this.serverInfo;
-  }
-
-  // Start an audio session
-  startSession(
-    codec: string = "pcm",
-    sampleRate: number = 44100,
-    channels: number = 2,
-    bitDepth: number = 16,
-  ): ServerSession {
-    if (this.session) {
-      throw new Error("Session already active");
+  public stop() {
+    for (const group of this.groups) {
+      if (group.activeSession) {
+        group.activeSession.end();
+      }
     }
-
-    // Create session info
-    const sessionInfo: SessionInfo = {
-      session_id: generateUniqueId("session"),
-      // Current timestamp in microseconds
-      now: Math.round((performance.timeOrigin + performance.now()) * 1000),
-      codec,
-      sample_rate: sampleRate,
-      channels,
-      bit_depth: bitDepth,
-      codec_header: null,
-    };
-
-    // Create new session with current clients
-    this.session = new ServerSession(
-      sessionInfo,
-      this.getClients(),
-      this.logger,
-      () => {
-        // This callback is called when the session ends itself
-        this.session = null;
-        this.logger.log(`Session ${sessionInfo.session_id} ended`);
-        this.fire("session-ended", { sessionId: sessionInfo.session_id });
-      },
-    );
-    this.fire("session-started", this.session);
-    return this.session;
-  }
-
-  // Get current session if exists
-  getSession(): ServerSession | null {
-    return this.session;
-  }
-
-  handleStreamCommand(clientId: string, command: string) {
-    throw new Error("Method not implemented.");
   }
 }

@@ -94,21 +94,18 @@ async function main() {
       process.exit(1);
     }
 
-    let session;
+    // Example server maintains a single group that all clients join
+    const group = musicServer.createGroup();
 
-    // If we're playing a test sound and a client connects,
-    // add them to the session.
     musicServer.on("client-added", (client) => {
-      if (session) {
-        session.addClient(client);
-      }
+      group.addClient(client);
     });
 
     // Start audio session and stream periodically
     const playAudio = async () => {
       logger.log("");
       logger.log("Sending WAV audio data to connected clients");
-      session = musicServer.startSession(
+      const session = group.startSession(
         "pcm",
         wavData.sampleRate,
         wavData.channels,
@@ -148,11 +145,14 @@ async function main() {
         }
 
         const chunk = wavData.audioData.slice(i, i + bytesPerSlice);
-        session.sendPCMAudioChunk(
-          chunk,
-          // We send microsecond timestamp as integer
-          Math.round(start * 1000),
-        );
+        // Only do actual audio sending if there are clients connected
+        if (group.size > 0) {
+          session.sendPCMAudioChunk(
+            chunk,
+            // We send microsecond timestamp as integer
+            Math.round(start * 1000),
+          );
+        }
         // Usually equal to timeSlice, but shorter for last chunk
         start += (chunk.length / bytesPerSlice) * timeSlice;
 
@@ -171,7 +171,6 @@ async function main() {
           100,
       );
       session.end();
-      session = null;
 
       await sleep(REPLAY_INTERVAL);
       playAudio();

@@ -119,12 +119,12 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
   }
 
   private handleClose() {
-    this.logger.log(`Player ${this.clientId} disconnected`);
+    this.logger.log(`Client ${this.clientId} disconnected`);
     this.fire("close");
   }
 
   private handleError(error: Error) {
-    this.logger.error(`Player ${this.clientId} error:`, error);
+    this.logger.error(`Client ${this.clientId} error:`, error);
   }
 
   getPlayerId(): string | null {

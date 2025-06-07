@@ -7,7 +7,7 @@ export class HTTPServer {
   private websocketServer: WebSocketServer | null = null;
 
   constructor(
-    private server: MusicServer,
+    private musicServer: MusicServer,
     public port: number,
     private logger: Logger = console,
   ) {}
@@ -25,15 +25,12 @@ export class HTTPServer {
 
   handleConnection(ws: WebSocket, request: any) {
     const playerClient = new ServerClient(ws, this.logger);
-    this.server.addClient(playerClient);
+    this.musicServer.addClient(playerClient);
   }
 
   // Stop the WebSocket server
   stop() {
-    const session = this.server.getSession();
-    if (session) {
-      session.end();
-    }
+    this.musicServer.stop();
 
     if (this.websocketServer) {
       this.websocketServer.close(() => {
