@@ -2,6 +2,45 @@
 
 A simple example of an audio player implementation using WebSockets.
 
+```mermaid
+---
+title: Server diagram
+---
+classDiagram
+
+        class HTTPServer 
+        class MusicServer {
+            serverInfo
+            clients
+            groups
+            createGroup()
+            groupJoin()
+            groupUnjoin()
+        }
+        class Group {
+            clients
+            activeSession
+            addClient()
+            removeClient()
+        }
+        class Client {
+            playerInfo
+            sendMessage()
+        }
+        class Session {
+            metadata
+            art
+            audioStream
+            end()
+        }
+
+        HTTPServer --|> MusicServer
+        MusicServer --|> Group
+        MusicServer --|> Client
+        Group --|> Client
+        Group --|> Session
+```
+
 ## Getting Started
 
 1. Install dependencies:
