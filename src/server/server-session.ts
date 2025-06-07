@@ -125,6 +125,19 @@ export class ServerSession extends EventEmitter<ServerSessionEvents> {
       if (this._lastReportedArt) {
         client.sendBinary(this._lastReportedArt);
       }
+      // TODO Commented out because we don't unlisten yet
+      // Any mutation of sessionActive need to take care of it.
+      // client.on("player-state", (state) => {
+      //   console.log(`Unhandled player state from ${client.clientId}:`, state);
+      // });
+      // TODO Commented out because we don't unlisten yet
+      // client.on("stream-command", (command) => {
+      //   console.log(
+      //     `Unhandled stream command from ${client.clientId}:`,
+      //     command,
+      //   );
+      // });
+
       this.sessionActive.add(client.clientId);
       yield client;
     }

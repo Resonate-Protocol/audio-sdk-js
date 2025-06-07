@@ -28,6 +28,7 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
   ) {
     super();
     this.clientId = generateUniqueId("client");
+    this.logger.log(`Client ${this.clientId} connected`);
     this.socket.on("message", this.handleMessage.bind(this));
     this.socket.on("close", this.handleClose.bind(this));
     this.socket.on("error", this.handleError.bind(this));
