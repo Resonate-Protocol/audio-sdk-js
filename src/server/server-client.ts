@@ -6,6 +6,7 @@ import type {
   ClientMessages,
   PlayerState,
   StreamCommandMessage,
+  ServerInfo,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
 import { generateUniqueId } from "../util/unique-id.js";
@@ -21,6 +22,7 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
   public clientId: string;
   public playerInfo: PlayerInfo | null = null;
   public playerState: PlayerState | null = null;
+  private _playerInfoReceived?: (value: unknown) => void;
 
   constructor(
     public readonly socket: WebSocket,
@@ -30,8 +32,13 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
     this.clientId = generateUniqueId("client");
     this.logger.log(`Client ${this.clientId} connected`);
     this.socket.on("message", this.handleMessage.bind(this));
-    this.socket.on("close", this.handleClose.bind(this));
-    this.socket.on("error", this.handleError.bind(this));
+    this.socket.on("close", () => {
+      this.logger.log(`Client ${this.clientId} disconnected`);
+      this.fire("close");
+    });
+    this.socket.on("error", (error) => {
+      this.logger.error(`Client ${this.clientId} error:`, error);
+    });
   }
 
   private handleMessage(message: any, isBinary: boolean) {
@@ -51,7 +58,12 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
 
   private processMessage(message: ClientMessages) {
     if (message.type === "player/hello") {
-      this.handlePlayerHello(message.payload);
+      this.playerInfo = message.payload;
+      this.logger.log("Client info received:", message.payload);
+      if (this._playerInfoReceived) {
+        this._playerInfoReceived(message.payload);
+        this._playerInfoReceived = undefined;
+      }
       return;
     }
 
@@ -72,7 +84,18 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
         this.fire("player-state", message.payload);
         break;
       case "player/time":
-        this.handlePlayerTime(message.payload);
+        this.send({
+          type: "source/time" as const,
+          payload: {
+            player_transmitted: message.payload.player_transmitted,
+            source_received: Math.round(
+              (performance.timeOrigin + performance.now()) * 1000,
+            ),
+            source_transmitted: Math.round(
+              (performance.timeOrigin + performance.now()) * 1000,
+            ),
+          },
+        });
         break;
       default:
         this.logger.log(
@@ -83,28 +106,17 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
     }
   }
 
-  private handlePlayerHello(playerInfo: PlayerInfo) {
-    this.playerInfo = playerInfo;
-    this.logger.log("Player info received:", playerInfo);
+  public async accept(serverInfo: ServerInfo) {
+    await new Promise((resolve) => {
+      this._playerInfoReceived = resolve;
+      this.send({
+        type: "source/hello" as const,
+        payload: serverInfo,
+      });
+    });
   }
 
-  private handlePlayerTime(playerTimeInfo: PlayerTimeInfo) {
-    const timeResponseMessage = {
-      type: "source/time" as const,
-      payload: {
-        player_transmitted: playerTimeInfo.player_transmitted,
-        source_received: Math.round(
-          (performance.timeOrigin + performance.now()) * 1000,
-        ),
-        source_transmitted: Math.round(
-          (performance.timeOrigin + performance.now()) * 1000,
-        ),
-      },
-    };
-    this.send(timeResponseMessage);
-  }
-
-  send(message: ServerMessages) {
+  public send(message: ServerMessages) {
     if (this.socket.readyState !== WebSocket.OPEN) {
       throw new Error("Client not connected");
     }
@@ -112,29 +124,14 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
     this.logger.log(`Sent to ${this.clientId}:`, message);
   }
 
-  sendBinary(data: ArrayBuffer) {
+  public sendBinary(data: ArrayBuffer) {
     if (this.socket.readyState !== WebSocket.OPEN) {
       throw new Error("Client not connected");
     }
     this.socket.send(data);
   }
 
-  private handleClose() {
-    this.logger.log(`Client ${this.clientId} disconnected`);
-    this.fire("close");
-  }
-
-  private handleError(error: Error) {
-    this.logger.error(`Client ${this.clientId} error:`, error);
-  }
-
-  getPlayerId(): string | null {
-    return this.playerInfo?.player_id || null;
-  }
-
   isReady(): boolean {
-    return (
-      this.socket.readyState === WebSocket.OPEN && this.playerInfo !== null
-    );
+    return this.socket.readyState === WebSocket.OPEN;
   }
 }

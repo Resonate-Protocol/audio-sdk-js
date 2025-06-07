@@ -19,12 +19,16 @@ export class MusicServer extends EventEmitter<MusicServerEvents> {
     super();
   }
 
-  addClient(client: ServerClient) {
-    client.send({
-      type: "source/hello" as const,
-      payload: this.serverInfo,
-    });
-    // TODO only do next steps if client gives proper response.
+  async addClient(client: ServerClient) {
+    try {
+      await client.accept(this.serverInfo);
+    } catch (error) {
+      this.logger.error(`Error adding client ${client.clientId}:`, error);
+      client.socket.close(1008, "Invalid client");
+      return;
+    }
+    this.logger.log(`Client ${client.clientId} accepted`);
+
     this.clients.set(client.clientId, client);
 
     client.on("close", () => {
