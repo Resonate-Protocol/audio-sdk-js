@@ -303,10 +303,15 @@
           connectButton.textContent = "Disconnect";
           connectionStatus.textContent = `Connected to ${url}`;
           logger.log(`Attempting connection to ${url}`);
-          await client.connect();
+          if (!(await client.connect())) {
+            connectionStatus.textContent = "Error: Connection failed";
+            logger.error("Connection failed");
+            return;
+          }
         } catch (error) {
           connectionStatus.textContent = `Error: ${error}`;
           logger.error("Connection error:", error);
+          return;
         }
 
         const groups = await client.getServerGroups();
