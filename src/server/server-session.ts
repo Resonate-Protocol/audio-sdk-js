@@ -8,7 +8,7 @@ import {
 import type { Logger } from "../logging.js";
 import { ServerGroup } from "./server-group.js";
 import { EventEmitter } from "../util/event-emitter.js";
-import { ServerClient } from "./server-client.js";
+import { ServerClient, ServerClientEvents } from "./server-client.js";
 import { arraysEqual } from "../util/array-equal.js";
 
 const HEADER_SIZE = 13;
@@ -16,6 +16,7 @@ const METADATA_ARRAY_FIELDS = ["group_members", "support_commands"];
 
 interface ServerSessionEvents {
   "session-end": ServerSession;
+  "stream-command": ServerClientEvents["stream-command"];
 }
 
 export class ServerSession extends EventEmitter<ServerSessionEvents> {
@@ -134,17 +135,12 @@ export class ServerSession extends EventEmitter<ServerSessionEvents> {
       if (this._lastReportedArt) {
         client.sendBinary(this._lastReportedArt);
       }
-      // TODO Commented out because we don't unlisten yet
-      // Any mutation of sessionActive need to take care of it.
+      client.on("stream-command", (command) => {
+        this.fire("stream-command", command);
+      });
+      // TODO Commented out because we don't unlisten yet and we should pass client along
       // client.on("player-state", (state) => {
       //   console.log(`Unhandled player state from ${client.clientId}:`, state);
-      // });
-      // TODO Commented out because we don't unlisten yet
-      // client.on("stream-command", (command) => {
-      //   console.log(
-      //     `Unhandled stream command from ${client.clientId}:`,
-      //     command,
-      //   );
       // });
 
       this.sessionActive.add(client.clientId);

@@ -11,7 +11,7 @@ import type { Logger } from "../logging.js";
 import { generateUniqueId } from "../util/unique-id.js";
 import { EventEmitter } from "../util/event-emitter.js";
 
-interface ServerClientEvents {
+export interface ServerClientEvents {
   close: void;
   "player-state": PlayerState | null;
   "stream-command": StreamCommandMessage["payload"];

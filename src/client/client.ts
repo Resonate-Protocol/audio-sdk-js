@@ -9,6 +9,7 @@ import {
   PlayerTimeMessage,
   GroupListMessage,
   ClientMessages,
+  MediaCommand,
 } from "../messages.js";
 import type { Logger } from "../logging.js";
 import { EventEmitter } from "../util/event-emitter.js";
@@ -419,6 +420,21 @@ export class Client extends EventEmitter<Events> {
     this.logger.log(
       `Server time difference (${sorted.length} samples): ${this.serverTimeDiff} s`,
     );
+  }
+
+  public sendStreamCommand(command: MediaCommand) {
+    if (!this.sessionInfo || !this.metadata) {
+      throw new Error("Cannot send command: no active session");
+    }
+    if (!this.metadata.support_commands.includes(command)) {
+      throw new Error(`Command ${command} not supported by session`);
+    }
+    this.send({
+      type: "stream/command",
+      payload: {
+        command,
+      },
+    });
   }
 
   public joinGroup(groupId: string) {

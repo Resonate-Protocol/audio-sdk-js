@@ -105,12 +105,19 @@ async function main() {
     const playAudio = async () => {
       logger.log("");
       logger.log("Sending WAV audio data to connected clients");
+      let endRequested = false;
       const session = group.startSession(
         "pcm",
         wavData.sampleRate,
         wavData.channels,
         wavData.bitDepth,
       );
+      session.on("stream-command", (command) => {
+        if (command.command === "stop") {
+          endRequested = true;
+          logger.log("Stop command received, stopping audio playback.");
+        }
+      });
       session.sendMetadata({
         title: "Sample Audio",
         artist: "Someone on the internet",
@@ -118,7 +125,7 @@ async function main() {
         year: null,
         track: null,
         group_members: [],
-        support_commands: ["play", "pause"],
+        support_commands: ["play", "stop"],
         repeat: "off",
         shuffle: false,
       });
@@ -129,6 +136,9 @@ async function main() {
         (timeSlice / 1000) * wavData.sampleRate * wavData.channels;
 
       for (let i = 0; i < wavData.audioData.length; i += bytesPerSlice) {
+        if (endRequested) {
+          break;
+        }
         // Mimick metadata update
         if (i % (bytesPerSlice * 10) === 0) {
           session.sendMetadata({
@@ -138,7 +148,7 @@ async function main() {
             year: null,
             track: null,
             group_members: [],
-            support_commands: ["play", "pause"],
+            support_commands: ["play", "stop"],
             repeat: "off",
             shuffle: false,
           });
