@@ -9,8 +9,10 @@ import type { Logger } from "../logging.js";
 import { ServerGroup } from "./server-group.js";
 import { EventEmitter } from "../util/event-emitter.js";
 import { ServerClient } from "./server-client.js";
+import { arraysEqual } from "../util/array-equal.js";
 
 const HEADER_SIZE = 13;
+const METADATA_ARRAY_FIELDS = ["group_members", "support_commands"];
 
 interface ServerSessionEvents {
   "session-end": ServerSession;
@@ -45,11 +47,18 @@ export class ServerSession extends EventEmitter<ServerSessionEvents> {
       payload = {};
       // Find updated fields
       for (const key in metadata) {
-        // TODO this does not work for values that are lists: group_members, support_commands
-        // @ts-ignore
-        if (this._lastReportedMetadata[key] !== metadata[key]) {
+        if (METADATA_ARRAY_FIELDS.includes(key)) {
           // @ts-ignore
-          payload[key] = metadata[key];
+          if (!arraysEqual(this._lastReportedMetadata[key], metadata[key])) {
+            // @ts-ignore
+            payload[key] = metadata[key];
+          }
+        } else {
+          // @ts-ignore
+          if (this._lastReportedMetadata[key] !== metadata[key]) {
+            // @ts-ignore
+            payload[key] = metadata[key];
+          }
         }
       }
       if (Object.keys(payload).length === 0) {
