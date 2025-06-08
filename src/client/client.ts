@@ -455,8 +455,6 @@ export class Client extends EventEmitter<Events> {
     // Make sure any currently playing audio is stopping
     this.audioContext.close();
     this.audioContext = new AudioContextClass();
-    this.serverTimeDiff = 0;
-    this.serverTimeDiffSamples = [];
   }
 
   // Close the WebSocket connection and clean up resources.
@@ -471,6 +469,8 @@ export class Client extends EventEmitter<Events> {
     // Make sure any currently playing audio is stopping
     this._resetAudioContext();
 
+    this.serverTimeDiff = 0;
+    this.serverTimeDiffSamples = [];
     this.serverInfo = null;
   }
 }
