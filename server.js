@@ -118,6 +118,9 @@ async function main() {
           logger.log("Stop command received, stopping audio playback.");
         }
       });
+      session.on("player-state", (state) => {
+        logger.log("Player state updated:", state);
+      });
       session.sendMetadata({
         title: "Sample Audio",
         artist: "Someone on the internet",

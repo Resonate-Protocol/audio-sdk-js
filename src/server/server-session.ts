@@ -17,10 +17,39 @@ const METADATA_ARRAY_FIELDS = ["group_members", "support_commands"];
 interface ServerSessionEvents {
   "session-end": ServerSession;
   "stream-command": ServerClientEvents["stream-command"];
+  "player-state": {
+    client: ServerClient;
+    state: ServerClientEvents["player-state"];
+  };
+}
+
+class ClientEventWrapper {
+  constructor(
+    private readonly session: ServerSession,
+    private readonly client: ServerClient,
+  ) {
+    this.client.on("stream-command", this._onStreamCommand);
+    this.client.on("player-state", this._onPlayerState);
+  }
+
+  public tearDown() {
+    this.client.off("stream-command", this._onStreamCommand);
+    this.client.off("player-state", this._onPlayerState);
+  }
+
+  private _onStreamCommand = (
+    command: ServerClientEvents["stream-command"],
+  ) => {
+    this.session.fire("stream-command", command);
+  };
+
+  private _onPlayerState = (state: ServerClientEvents["player-state"]) => {
+    this.session.fire("player-state", { client: this.client, state });
+  };
 }
 
 export class ServerSession extends EventEmitter<ServerSessionEvents> {
-  sessionActive: Set<string> = new Set();
+  sessionActive: Map<string, ClientEventWrapper> = new Map();
 
   private _lastReportedMetadata: Metadata | null = null;
   private _lastReportedArt: Buffer<ArrayBuffer> | null = null;
@@ -31,9 +60,9 @@ export class ServerSession extends EventEmitter<ServerSessionEvents> {
     private readonly logger: Logger,
   ) {
     super();
-    this.group.on("client-removed", this._clientRemoved);
+    this.group.on("client-removed", this._handleGroupRemovedClient);
     this.on("session-end", () => {
-      this.group.off("client-removed", this._clientRemoved);
+      this.group.off("client-removed", this._handleGroupRemovedClient);
     });
   }
 
@@ -87,7 +116,7 @@ export class ServerSession extends EventEmitter<ServerSessionEvents> {
     };
     // Send session end message to all active clients
     // Avoid sendMessage as it can activate clients
-    for (const clientId of this.sessionActive) {
+    for (const clientId of this.sessionActive.keys()) {
       const client = this.group.clients.get(clientId);
       if (client && client.isReady()) {
         client.send(sessionEndMessage);
@@ -114,6 +143,7 @@ export class ServerSession extends EventEmitter<ServerSessionEvents> {
       if (!client.isReady()) {
         this.logger.log(`Client ${client.clientId} not ready, skipping`);
         if (this.sessionActive.has(client.clientId)) {
+          this.sessionActive.get(client.clientId)!.tearDown();
           this.sessionActive.delete(client.clientId);
         }
         continue;
@@ -135,15 +165,10 @@ export class ServerSession extends EventEmitter<ServerSessionEvents> {
       if (this._lastReportedArt) {
         client.sendBinary(this._lastReportedArt);
       }
-      client.on("stream-command", (command) => {
-        this.fire("stream-command", command);
-      });
-      // TODO Commented out because we don't unlisten yet and we should pass client along
-      // client.on("player-state", (state) => {
-      //   console.log(`Unhandled player state from ${client.clientId}:`, state);
-      // });
-
-      this.sessionActive.add(client.clientId);
+      this.sessionActive.set(
+        client.clientId,
+        new ClientEventWrapper(this, client),
+      );
       yield client;
     }
   }
@@ -251,15 +276,17 @@ export class ServerSession extends EventEmitter<ServerSessionEvents> {
     );
   }
 
-  private _clientRemoved = (client: ServerClient) => {
-    if (this.sessionActive.has(client.clientId) && client.isReady()) {
-      client.send({
-        type: "session/end" as const,
-        payload: {
-          sessionId: this.sessionInfo.session_id,
-        },
-      });
-      this.sessionActive.delete(client.clientId);
+  private _handleGroupRemovedClient = (client: ServerClient) => {
+    if (!this.sessionActive.has(client.clientId) || !client.isReady()) {
+      return;
     }
+    this.sessionActive.get(client.clientId)!.tearDown();
+    this.sessionActive.delete(client.clientId);
+    client.send({
+      type: "session/end" as const,
+      payload: {
+        sessionId: this.sessionInfo.session_id,
+      },
+    });
   };
 }
