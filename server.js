@@ -9,11 +9,11 @@ import { fileURLToPath } from "url";
 const PORT = 3001;
 const WAV_FILE = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  "sample.wav",
+  "example-assets/server/sample.wav",
 );
 const ART_FILE = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  "927-square.png",
+  "example-assets/server/927-square.png",
 );
 const REPLAY_INTERVAL = 10000; // Replay WAV file every 5 seconds
 
