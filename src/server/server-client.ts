@@ -111,13 +111,13 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
         break;
       case "player/time":
         this.send({
-          type: "source/time" as const,
+          type: "server/time" as const,
           payload: {
             player_transmitted: message.payload.player_transmitted,
-            source_received: Math.round(
+            server_received: Math.round(
               (performance.timeOrigin + performance.now()) * 1000,
             ),
-            source_transmitted: Math.round(
+            server_transmitted: Math.round(
               (performance.timeOrigin + performance.now()) * 1000,
             ),
           },
@@ -135,7 +135,7 @@ export class ServerClient extends EventEmitter<ServerClientEvents> {
   public async accept(serverInfo: ServerInfo) {
     await new Promise((resolve) => {
       this.send({
-        type: "source/hello" as const,
+        type: "server/hello" as const,
         payload: serverInfo,
       });
       if (this.playerInfo) {
